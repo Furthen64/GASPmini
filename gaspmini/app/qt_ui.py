@@ -7,12 +7,12 @@ from __future__ import annotations
 import sys
 from typing import Optional
 
-from PySide6.QtCore import Qt, QTimer, QPoint
+from PySide6.QtCore import Qt, QTimer, QRectF, QSize
 from PySide6.QtGui import QColor, QPainter, QFont, QMouseEvent, QPen
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
-    QPushButton, QLabel, QTextEdit, QLineEdit, QGroupBox, QSplitter,
-    QScrollArea, QComboBox,
+    QPushButton, QLabel, QTextEdit, QLineEdit, QGroupBox, QComboBox,
+    QSizePolicy, QScrollArea,
 )
 
 import app.config as config
@@ -48,15 +48,48 @@ class GridWidget(QWidget):
         self._sim = sim
         self._selected_creature_id: Optional[int] = None
         self.setMouseTracking(True)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._update_size()
 
+    def _native_grid_size(self) -> QSize:
+        world = self._sim.world
+        if world is None:
+            return QSize(CELL_SIZE, CELL_SIZE)
+        return QSize(world.width * CELL_SIZE, world.height * CELL_SIZE)
+
     def _update_size(self) -> None:
-        if self._sim.world is None:
-            return
-        w = self._sim.world.width * CELL_SIZE
-        h = self._sim.world.height * CELL_SIZE
-        self.setMinimumSize(w, h)
-        self.setFixedSize(w, h)
+        self.updateGeometry()
+
+    def sizeHint(self) -> QSize:
+        return self._native_grid_size()
+
+    def minimumSizeHint(self) -> QSize:
+        native = self._native_grid_size()
+        return native.scaled(240, 160, Qt.AspectRatioMode.KeepAspectRatio)
+
+    def hasHeightForWidth(self) -> bool:
+        return True
+
+    def heightForWidth(self, width: int) -> int:
+        native = self._native_grid_size()
+        if native.width() <= 0:
+            return width
+        return max(1, int(width * native.height() / native.width()))
+
+    def _grid_viewport(self) -> tuple[QRectF, float]:
+        native = self._native_grid_size()
+        if native.width() <= 0 or native.height() <= 0:
+            return QRectF(0.0, 0.0, float(self.width()), float(self.height())), 1.0
+
+        scale = min(self.width() / native.width(), self.height() / native.height())
+        if scale <= 0:
+            return QRectF(0.0, 0.0, float(self.width()), float(self.height())), 1.0
+
+        scaled_w = native.width() * scale
+        scaled_h = native.height() * scale
+        offset_x = (self.width() - scaled_w) / 2
+        offset_y = (self.height() - scaled_h) / 2
+        return QRectF(offset_x, offset_y, scaled_w, scaled_h), scale
 
     def set_selected(self, creature_id: Optional[int]) -> None:
         self._selected_creature_id = creature_id
@@ -65,8 +98,14 @@ class GridWidget(QWidget):
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
         world = self._sim.world
+        painter.fillRect(self.rect(), CELL_COLORS[CellType.EMPTY])
         if world is None:
             return
+
+        viewport, scale = self._grid_viewport()
+        painter.save()
+        painter.translate(viewport.left(), viewport.top())
+        painter.scale(scale, scale)
 
         from app.world import get_cell_type
         creature_positions: dict[tuple[int, int], Creature] = {
@@ -95,17 +134,27 @@ class GridWidget(QWidget):
                 painter.setPen(QPen(GRID_LINE_COLOR, 0))
                 painter.drawRect(px, py, CELL_SIZE - 1, CELL_SIZE - 1)
 
+        painter.restore()
         painter.end()
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         if self._sim.world is None:
             return
-        x = int(event.position().x() // CELL_SIZE)
-        y = int(event.position().y() // CELL_SIZE)
-        # Ignore clicks outside the valid grid area
+
         world = self._sim.world
+        viewport, scale = self._grid_viewport()
+        if scale <= 0 or not viewport.contains(event.position()):
+            return
+
+        local_x = (event.position().x() - viewport.left()) / scale
+        local_y = (event.position().y() - viewport.top()) / scale
+        x = int(local_x // CELL_SIZE)
+        y = int(local_y // CELL_SIZE)
+
+        # Ignore clicks outside the valid grid area
         if x < 0 or x >= world.width or y < 0 or y >= world.height:
             return
+
         # Find the parent MainWindow and notify
         parent = self.parent()
         while parent and not isinstance(parent, MainWindow):
@@ -143,20 +192,22 @@ class MainWindow(QMainWindow):
         central = QWidget()
         self.setCentralWidget(central)
         root_layout = QHBoxLayout(central)
+        root_layout.setStretch(0, 3)
+        root_layout.setStretch(1, 1)
 
         # ── Left: grid ────────────────────────────────────────────────────────
         self._grid_widget = GridWidget(self._sim)
-
-        scroll = QScrollArea()
-        scroll.setWidget(self._grid_widget)
-        scroll.setWidgetResizable(False)
-
-        root_layout.addWidget(scroll, stretch=3)
+        root_layout.addWidget(self._grid_widget)
 
         # ── Right: controls + info ─────────────────────────────────────────────
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
-        root_layout.addWidget(right_panel, stretch=1)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_scroll = QScrollArea()
+        right_scroll.setWidget(right_panel)
+        right_scroll.setWidgetResizable(True)
+        right_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        root_layout.addWidget(right_scroll)
 
         # Simulation status
         status_group = QGroupBox("Simulation")
@@ -247,6 +298,10 @@ class MainWindow(QMainWindow):
         self._log_text.setFont(QFont("Courier", 8))
         log_layout.addWidget(self._log_text)
         right_layout.addWidget(log_group)
+        right_layout.addStretch(1)
+
+        native_grid = self._grid_widget.sizeHint()
+        self.resize(native_grid.width() + 420, max(native_grid.height(), 720))
 
     # ── Refresh ────────────────────────────────────────────────────────────────
 

@@ -27,10 +27,10 @@ if (-not (Test-Path $VenvPy)) {
     $RebuildVenv = $true
 } else {
     # Check that the venv python matches the requested python
-    $VenvPyReal    = (& $VenvPy -c "import sys; print(sys.executable)" 2>$null)
-    $RequestedReal = (& $PYTHON -c "import sys; print(sys.executable)" 2>$null)
-    if ($VenvPyReal -ne $RequestedReal) {
-        Write-Host ".venv python ($VenvPyReal) differs from requested ($RequestedReal) — rebuilding..."
+    $VenvBaseReal  = (& $VenvPy -c "import os, sys; print(os.path.realpath(getattr(sys, '_base_executable', sys.executable)))" 2>$null)
+    $RequestedReal = (& $PYTHON -c "import os, sys; print(os.path.realpath(sys.executable))" 2>$null)
+    if ($VenvBaseReal -ne $RequestedReal) {
+        Write-Host ".venv base python ($VenvBaseReal) differs from requested ($RequestedReal) — rebuilding..."
         $RebuildVenv = $true
     }
 }
@@ -48,16 +48,28 @@ if ($RebuildVenv) {
     Write-Host ".venv created."
 }
 
-# ── Upgrade pip and install / refresh dependencies ────────────────────────────
-Write-Host "Upgrading pip..."
-& $VenvPy -m pip install --upgrade pip --quiet
+# ── Upgrade pip and install / refresh dependencies only when needed ──────────
+$RefreshDeps = $RebuildVenv
 
-Write-Host "Installing dependencies..."
-& $VenvPip install PySide6 pytest --quiet
+if (-not $RefreshDeps) {
+    & $VenvPy -c "import importlib.util, sys; sys.exit(0 if importlib.util.find_spec('PySide6') and importlib.util.find_spec('pytest') else 1)" 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Dependencies missing from .venv — installing..."
+        $RefreshDeps = $true
+    }
+}
 
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "Dependency installation failed."
-    exit 1
+if ($RefreshDeps) {
+    Write-Host "Upgrading pip..."
+    & $VenvPy -m pip install --upgrade pip --quiet
+
+    Write-Host "Installing dependencies..."
+    & $VenvPip install PySide6 pytest --quiet
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Dependency installation failed."
+        exit 1
+    }
 }
 
 Write-Host "Dependencies OK."

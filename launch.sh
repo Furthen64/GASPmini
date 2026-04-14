@@ -30,10 +30,10 @@ if [[ ! -x "$VENV_PY" ]]; then
     echo ".venv not found — creating it..."
     REBUILD_VENV=1
 else
-    VENV_PY_REAL="$("$VENV_PY"  -c 'import sys; print(sys.executable)')"
-    REQUESTED_REAL="$("$PYTHON" -c 'import sys; print(sys.executable)')"
-    if [[ "$VENV_PY_REAL" != "$REQUESTED_REAL" ]]; then
-        echo ".venv python ($VENV_PY_REAL) differs from requested ($REQUESTED_REAL) — rebuilding..."
+    VENV_BASE_REAL="$($VENV_PY  -c 'import os, sys; print(os.path.realpath(getattr(sys, "_base_executable", sys.executable)))')"
+    REQUESTED_REAL="$($PYTHON -c 'import os, sys; print(os.path.realpath(sys.executable))')"
+    if [[ "$VENV_BASE_REAL" != "$REQUESTED_REAL" ]]; then
+        echo ".venv base python ($VENV_BASE_REAL) differs from requested ($REQUESTED_REAL) — rebuilding..."
         REBUILD_VENV=1
     fi
 fi
@@ -47,12 +47,23 @@ if [[ $REBUILD_VENV -eq 1 ]]; then
     echo ".venv created."
 fi
 
-# ── Upgrade pip and install / refresh dependencies ────────────────────────────
-echo "Upgrading pip..."
-"$VENV_PY" -m pip install --upgrade pip --quiet
+# ── Upgrade pip and install / refresh dependencies only when needed ──────────
+REFRESH_DEPS=$REBUILD_VENV
 
-echo "Installing dependencies..."
-"$VENV_PY" -m pip install PySide6 pytest --quiet
+if [[ $REFRESH_DEPS -eq 0 ]]; then
+    if ! "$VENV_PY" -c 'import importlib.util, sys; sys.exit(0 if importlib.util.find_spec("PySide6") and importlib.util.find_spec("pytest") else 1)' >/dev/null 2>&1; then
+        echo "Dependencies missing from .venv — installing..."
+        REFRESH_DEPS=1
+    fi
+fi
+
+if [[ $REFRESH_DEPS -eq 1 ]]; then
+    echo "Upgrading pip..."
+    "$VENV_PY" -m pip install --upgrade pip --quiet
+
+    echo "Installing dependencies..."
+    "$VENV_PY" -m pip install PySide6 pytest --quiet
+fi
 
 echo "Dependencies OK."
 
