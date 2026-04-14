@@ -15,8 +15,9 @@ from app.logging_utils import log
 
 
 class SimulationRunner:
-    def __init__(self, seed: int = DEFAULT_SEED) -> None:
+    def __init__(self, seed: int = DEFAULT_SEED, ticks_per_epoch: int = TICKS_PER_EPOCH) -> None:
         self.seed = seed
+        self.ticks_per_epoch = ticks_per_epoch
         self.world: WorldState | None = None
         self._rng: random.Random = make_rng(seed)
         self.epoch_history: list[dict] = []  # brief per-epoch summary
@@ -43,7 +44,7 @@ class SimulationRunner:
             self.reset()
         assert self.world is not None
 
-        if self.world.tick_index >= TICKS_PER_EPOCH:
+        if self.world.tick_index >= self.ticks_per_epoch or self.alive_count() == 0:
             self.step_epoch()
             return
 
@@ -58,7 +59,7 @@ class SimulationRunner:
         assert self.world is not None
 
         # Drain remaining ticks if needed
-        while self.world.tick_index < TICKS_PER_EPOCH:
+        while self.world.tick_index < self.ticks_per_epoch and self.alive_count() > 0:
             tick_world(self.world)
 
         # Collect results and log
@@ -91,7 +92,7 @@ class SimulationRunner:
     def is_epoch_over(self) -> bool:
         if self.world is None:
             return False
-        return self.world.tick_index >= TICKS_PER_EPOCH
+        return self.world.tick_index >= self.ticks_per_epoch or self.alive_count() == 0
 
     def alive_count(self) -> int:
         if self.world is None:
