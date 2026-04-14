@@ -5,10 +5,7 @@ from __future__ import annotations
 
 import random
 
-from app.config import (
-    GENE_MATCH_SCORE, GENE_WILDCARD_SCORE, GENE_MISMATCH_SCORE,
-    DEBUG_GENE_SCORING,
-)
+import app.config as config
 from app.models import Gene, Genome, GenePattern, SensorField, Creature
 from app.logging_utils import debug_log
 
@@ -17,10 +14,10 @@ from app.logging_utils import debug_log
 
 def _score_field(pattern_value, sensor_value) -> float:
     if pattern_value is None:
-        return GENE_WILDCARD_SCORE
+        return config.GENE_WILDCARD_SCORE
     if pattern_value == sensor_value:
-        return GENE_MATCH_SCORE
-    return GENE_MISMATCH_SCORE
+        return config.GENE_MATCH_SCORE
+    return config.GENE_MISMATCH_SCORE
 
 
 # ── Pattern matching ──────────────────────────────────────────────────────────
@@ -61,7 +58,7 @@ def choose_gene(creature: Creature, sensor: SensorField) -> Gene:
     ]
     scored.sort(key=lambda x: x[0], reverse=True)
 
-    if DEBUG_GENE_SCORING:
+    if config.DEBUG_GENE_SCORING:
         for sc, g in scored[:5]:
             debug_log(
                 f"  Gene {g.gene_id}: total={sc:.2f}  "

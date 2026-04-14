@@ -12,10 +12,10 @@ from PySide6.QtGui import QColor, QPainter, QFont, QMouseEvent, QPen
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
     QPushButton, QLabel, QTextEdit, QLineEdit, QGroupBox, QSplitter,
-    QScrollArea,
+    QScrollArea, QComboBox,
 )
 
-from app.config import TICKS_PER_EPOCH
+import app.config as config
 from app.models import CellType, Creature, WorldState
 from app.simulation_runner import SimulationRunner
 from app.sensors import build_sensor_data
@@ -121,7 +121,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("GASPmini")
 
-        self._sim = SimulationRunner()
+        self._sim = SimulationRunner(profile_id=config.DEFAULT_PROFILE_ID)
         self._sim.reset()
 
         self._timer = QTimer(self)
@@ -207,6 +207,18 @@ class MainWindow(QMainWindow):
         btn_new_seed.clicked.connect(self._on_new_seed)
         seed_layout.addWidget(btn_new_seed)
         ctrl_layout.addLayout(seed_layout)
+
+        profile_layout = QHBoxLayout()
+        profile_layout.addWidget(QLabel("Profile:"))
+        self._profile_combo = QComboBox()
+        for profile_id, label in config.get_profile_items():
+            self._profile_combo.addItem(label, profile_id)
+        profile_index = self._profile_combo.findData(self._sim.profile_id)
+        if profile_index >= 0:
+            self._profile_combo.setCurrentIndex(profile_index)
+        self._profile_combo.currentIndexChanged.connect(self._on_profile_changed)
+        profile_layout.addWidget(self._profile_combo)
+        ctrl_layout.addLayout(profile_layout)
 
         # Ticks per epoch control
         tpe_layout = QHBoxLayout()
@@ -378,6 +390,19 @@ class MainWindow(QMainWindow):
     def _on_step_epoch(self) -> None:
         self._on_pause()
         self._sim.step_epoch()
+        self._refresh()
+
+    def _on_profile_changed(self) -> None:
+        profile_id = self._profile_combo.currentData()
+        if profile_id is None or profile_id == self._sim.profile_id:
+            return
+
+        self._on_pause()
+        self._sim.set_profile(profile_id)
+        self._tpe_edit.setText(str(self._sim.ticks_per_epoch))
+        self._selected_creature = None
+        self._grid_widget.set_selected(None)
+        self._sim.reset()
         self._refresh()
 
     def _on_reset(self) -> None:

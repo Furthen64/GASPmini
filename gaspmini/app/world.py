@@ -7,13 +7,7 @@ from __future__ import annotations
 import random
 from typing import Optional
 
-from app.config import (
-    GRID_WIDTH, GRID_HEIGHT,
-    POPULATION_SIZE, FOOD_COUNT, INTERIOR_WALL_COUNT,
-    INITIAL_ENERGY, DEFAULT_SEED,
-    DEFAULT_LEARNING_RATE, DEFAULT_REWARD_DECAY,
-    DEFAULT_EXPLORATION_RATE, INITIAL_GENE_COUNT, HISTORY_LENGTH,
-)
+import app.config as config
 from app.models import (
     CellType, Direction, ActionType,
     Gene, GenePattern, Genome, LifetimeState, Creature, WorldState,
@@ -149,8 +143,11 @@ def _make_random_gene_pattern(rng: random.Random) -> GenePattern:
     )
 
 
-def make_random_genome(rng: random.Random, gene_count: int = INITIAL_GENE_COUNT) -> Genome:
+def make_random_genome(rng: random.Random, gene_count: int | None = None) -> Genome:
     """Create a genome with random genes and slightly varied parameters."""
+    if gene_count is None:
+        gene_count = config.INITIAL_GENE_COUNT
+
     genes = [
         Gene(
             gene_id=i,
@@ -162,10 +159,10 @@ def make_random_genome(rng: random.Random, gene_count: int = INITIAL_GENE_COUNT)
     ]
     return Genome(
         genes=genes,
-        learning_rate=max(0.01, DEFAULT_LEARNING_RATE + rng.uniform(-0.05, 0.05)),
-        reward_decay=max(0.1, min(0.99, DEFAULT_REWARD_DECAY + rng.uniform(-0.05, 0.05))),
-        exploration_rate=max(0.0, DEFAULT_EXPLORATION_RATE + rng.uniform(-0.02, 0.02)),
-        history_length=HISTORY_LENGTH,
+        learning_rate=max(0.01, config.DEFAULT_LEARNING_RATE + rng.uniform(-0.05, 0.05)),
+        reward_decay=max(0.1, min(0.99, config.DEFAULT_REWARD_DECAY + rng.uniform(-0.05, 0.05))),
+        exploration_rate=max(0.0, config.DEFAULT_EXPLORATION_RATE + rng.uniform(-0.02, 0.02)),
+        history_length=config.HISTORY_LENGTH,
     )
 
 
@@ -194,7 +191,7 @@ def spawn_creatures(
             x=x,
             y=y,
             direction=rng.choice(list(Direction)),
-            energy=float(INITIAL_ENERGY),
+            energy=float(config.INITIAL_ENERGY),
         )
         world.creatures.append(Creature(
             creature_id=idx,
@@ -205,15 +202,28 @@ def spawn_creatures(
 
 def generate_world(
     epoch_index: int = 0,
-    seed: int = DEFAULT_SEED,
+    seed: int | None = None,
     genomes: Optional[list[Genome]] = None,
-    population_size: int = POPULATION_SIZE,
-    food_count: int = FOOD_COUNT,
-    interior_wall_count: int = INTERIOR_WALL_COUNT,
-    width: int = GRID_WIDTH,
-    height: int = GRID_HEIGHT,
+    population_size: int | None = None,
+    food_count: int | None = None,
+    interior_wall_count: int | None = None,
+    width: int | None = None,
+    height: int | None = None,
 ) -> WorldState:
     """Create a fresh world for the given epoch."""
+    if seed is None:
+        seed = config.DEFAULT_SEED
+    if population_size is None:
+        population_size = config.POPULATION_SIZE
+    if food_count is None:
+        food_count = config.FOOD_COUNT
+    if interior_wall_count is None:
+        interior_wall_count = config.INTERIOR_WALL_COUNT
+    if width is None:
+        width = config.GRID_WIDTH
+    if height is None:
+        height = config.GRID_HEIGHT
+
     # Use epoch-derived seed so each epoch has a different but reproducible layout.
     rng = make_rng(seed + epoch_index * 1000)
 

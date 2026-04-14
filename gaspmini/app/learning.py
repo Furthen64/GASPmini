@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from app.config import DEBUG_REWARDS, HISTORY_LENGTH
+import app.config as config
 from app.models import Creature, HistoryEntry
 from app.logging_utils import debug_log
 
@@ -15,7 +15,7 @@ def record_history(
 ) -> None:
     """Append a history entry and trim to max length."""
     lt = creature.lifetime
-    max_len = creature.genome.history_length or HISTORY_LENGTH
+    max_len = creature.genome.history_length or config.HISTORY_LENGTH
     lt.history.append(entry)
     if len(lt.history) > max_len:
         lt.history = lt.history[-max_len:]
@@ -57,7 +57,7 @@ def apply_reward_to_history(
         current = lt.learned_gene_adjustments.get(gene_id, 0.0)
         lt.learned_gene_adjustments[gene_id] = current + adjustment
 
-        if DEBUG_REWARDS:
+        if config.DEBUG_REWARDS:
             debug_log(
                 f"  Learning: gene={gene_id}  steps_back={steps_back}  "
                 f"reward={reward:.2f}  decay^n={decay**steps_back:.3f}  "

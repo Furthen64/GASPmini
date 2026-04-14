@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from app.config import INITIAL_ENERGY
+import app.config as config
 from app.models import CellType, Direction, SensorField, Creature, WorldState
 from app.world import get_cell_type
 
@@ -50,11 +50,11 @@ def _cell_in_direction(
 def _hunger_bucket(energy: float) -> int:
     """Map energy level to a hunger bucket 0–3."""
     # Bucket boundaries relative to INITIAL_ENERGY
-    if energy >= INITIAL_ENERGY * 0.75:
+    if energy >= config.INITIAL_ENERGY * 0.75:
         return 0  # full
-    elif energy >= INITIAL_ENERGY * 0.40:
+    elif energy >= config.INITIAL_ENERGY * 0.40:
         return 1  # medium
-    elif energy >= INITIAL_ENERGY * 0.15:
+    elif energy >= config.INITIAL_ENERGY * 0.15:
         return 2  # low
     else:
         return 3  # critical

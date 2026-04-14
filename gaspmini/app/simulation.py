@@ -3,12 +3,7 @@
 
 from __future__ import annotations
 
-from app.config import (
-    ENERGY_GAIN_FROM_FOOD, ENERGY_LOSS_PER_TICK,
-    REWARD_EAT_FOOD, REWARD_FAILED_MOVE, REWARD_FAILED_EAT,
-    REWARD_IDLE, REWARD_DEATH, REWARD_STARVATION_TICK,
-    DEBUG_SENSORS, DEBUG_ACTIONS, DEBUG_GENE_SCORING,
-)
+import app.config as config
 from app.models import (
     ActionType, CellType, Creature, WorldState, ActionResult, HistoryEntry,
 )
@@ -52,10 +47,10 @@ def execute_action(
         fx, fy = _front_position(creature)
         if not is_walkable(world, fx, fy):
             lt.failed_actions += 1
-            return ActionResult(success=False, reward=REWARD_FAILED_MOVE, notes="wall block")
+            return ActionResult(success=False, reward=config.REWARD_FAILED_MOVE, notes="wall block")
         if creature_at(world, fx, fy) is not None:
             lt.failed_actions += 1
-            return ActionResult(success=False, reward=REWARD_FAILED_MOVE, notes="creature block")
+            return ActionResult(success=False, reward=config.REWARD_FAILED_MOVE, notes="creature block")
         lt.x, lt.y = fx, fy
         return ActionResult(success=True, reward=0.0, notes=f"moved to ({fx},{fy})")
 
@@ -64,13 +59,13 @@ def execute_action(
         if (fx, fy) in world.food_positions:
             world.food_positions.discard((fx, fy))
             lt.food_eaten += 1
-            lt.energy += ENERGY_GAIN_FROM_FOOD
-            return ActionResult(success=True, reward=REWARD_EAT_FOOD, notes="ate food")
+            lt.energy += config.ENERGY_GAIN_FROM_FOOD
+            return ActionResult(success=True, reward=config.REWARD_EAT_FOOD, notes="ate food")
         lt.failed_actions += 1
-        return ActionResult(success=False, reward=REWARD_FAILED_EAT, notes="no food in front")
+        return ActionResult(success=False, reward=config.REWARD_FAILED_EAT, notes="no food in front")
 
     elif action == ActionType.IDLE:
-        return ActionResult(success=True, reward=REWARD_IDLE, notes="idle")
+        return ActionResult(success=True, reward=config.REWARD_IDLE, notes="idle")
 
     return ActionResult(success=False, reward=0.0, notes="unknown action")
 
@@ -86,12 +81,12 @@ def tick_creature(creature: Creature, world: WorldState) -> None:
 
     # 1. Build sensor snapshot
     sensor = build_sensor_data(creature, world)
-    if DEBUG_SENSORS:
+    if config.DEBUG_SENSORS:
         debug_log(f"Creature {creature.creature_id} sensor: {sensor}")
 
     # 2. Choose gene
     gene = choose_gene(creature, sensor)
-    if DEBUG_GENE_SCORING:
+    if config.DEBUG_GENE_SCORING:
         debug_log(
             f"Creature {creature.creature_id} chose gene {gene.gene_id} "
             f"→ {gene.action.name}"
@@ -101,7 +96,7 @@ def tick_creature(creature: Creature, world: WorldState) -> None:
     action = gene.action
     result = execute_action(creature, action, world)
 
-    if DEBUG_ACTIONS:
+    if config.DEBUG_ACTIONS:
         debug_log(
             f"Creature {creature.creature_id} action={action.name}  "
             f"success={result.success}  reward={result.reward:.2f}  "
@@ -109,7 +104,7 @@ def tick_creature(creature: Creature, world: WorldState) -> None:
         )
 
     # 4. Energy drain
-    lt.energy -= ENERGY_LOSS_PER_TICK
+    lt.energy -= config.ENERGY_LOSS_PER_TICK
     lt.age_ticks += 1
 
     # 5. Record history
@@ -134,7 +129,7 @@ def tick_creature(creature: Creature, world: WorldState) -> None:
     # 8. Check death by starvation
     if lt.energy <= 0:
         lt.alive = False
-        apply_reward_to_history(creature, REWARD_DEATH)
+        apply_reward_to_history(creature, config.REWARD_DEATH)
         log(
             f"Creature {creature.creature_id} died at tick {world.tick_index} "
             f"(food eaten: {lt.food_eaten})"

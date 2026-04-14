@@ -7,7 +7,7 @@ from __future__ import annotations
 import copy
 import random
 
-from app.config import TICKS_PER_EPOCH, POPULATION_SIZE, DEFAULT_SEED
+import app.config as config
 from app.models import WorldState, Creature, Genome, CreatureEpochResult
 from app.world import generate_world, make_rng
 from app.simulation import tick_world
@@ -16,15 +16,27 @@ from app.logging_utils import log
 
 
 class SimulationRunner:
-    def __init__(self, seed: int = DEFAULT_SEED, ticks_per_epoch: int = TICKS_PER_EPOCH) -> None:
-        self.seed = seed
-        self.ticks_per_epoch = ticks_per_epoch
+    def __init__(
+        self,
+        seed: int | None = None,
+        ticks_per_epoch: int | None = None,
+        profile_id: str | None = None,
+    ) -> None:
+        self.profile_id = profile_id or config.ACTIVE_PROFILE_ID
+        config.apply_profile(self.profile_id)
+        self.seed = config.DEFAULT_SEED if seed is None else seed
+        self.ticks_per_epoch = config.TICKS_PER_EPOCH if ticks_per_epoch is None else ticks_per_epoch
         self.world: WorldState | None = None
-        self._rng: random.Random = make_rng(seed)
+        self._rng: random.Random = make_rng(self.seed)
         self.epoch_history: list[dict] = []  # brief per-epoch summary
         self.best_genome_ever: Genome | None = None
         self.best_fitness_ever: float | None = None
         self.best_epoch_ever: int | None = None
+
+    def set_profile(self, profile_id: str) -> None:
+        config.apply_profile(profile_id)
+        self.profile_id = profile_id
+        self.ticks_per_epoch = config.TICKS_PER_EPOCH
 
     # ── Initialisation ─────────────────────────────────────────────────────────
 

@@ -7,6 +7,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import unittest
 import random
 
+import app.config as config
 from app.models import (
     ActionType, CellType, Direction,
     Gene, GenePattern, Genome, LifetimeState, Creature, WorldState,
@@ -194,6 +195,21 @@ class TestEvolution(unittest.TestCase):
         self.assertEqual(sim.epoch_best_fitnesses(), [(0, sim.epoch_history[0]['top_fitness'])])
         self.assertEqual(sim.best_epoch_ever, 0)
         self.assertAlmostEqual(sim.best_fitness_ever, sim.epoch_history[0]['top_fitness'])
+
+    def test_profile_selection_changes_world_settings(self):
+        original_profile = config.ACTIVE_PROFILE_ID
+        try:
+            sim = SimulationRunner(seed=3)
+            sim.set_profile('longer_strategic')
+            sim.reset()
+
+            self.assertEqual(sim.profile_id, 'longer_strategic')
+            self.assertEqual(sim.ticks_per_epoch, config.TICKS_PER_EPOCH)
+            self.assertEqual(sim.world.width, config.GRID_WIDTH)
+            self.assertEqual(sim.world.height, config.GRID_HEIGHT)
+            self.assertEqual(len(sim.world.creatures), config.POPULATION_SIZE)
+        finally:
+            config.apply_profile(original_profile)
 
 
 if __name__ == '__main__':

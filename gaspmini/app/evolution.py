@@ -7,12 +7,7 @@ import random
 import copy
 from typing import Optional
 
-from app.config import (
-    ELITE_FRACTION, OFFSPRING_FRACTION, RANDOM_NEW_FRACTION,
-    FITNESS_FOOD_WEIGHT, FITNESS_AGE_WEIGHT, FITNESS_FAILED_WEIGHT,
-    MUTATION_RATE, PARAM_MUTATION_RATE, PARAM_MUTATION_DELTA,
-    INITIAL_GENE_COUNT, DEBUG_EVOLUTION,
-)
+import app.config as config
 from app.models import (
     CellType, ActionType, Creature, Genome, Gene, GenePattern,
     CreatureEpochResult, WorldState,
@@ -26,9 +21,9 @@ from app.logging_utils import debug_log, log
 def compute_fitness(creature: Creature) -> float:
     lt = creature.lifetime
     return (
-        FITNESS_FOOD_WEIGHT * lt.food_eaten
-        + FITNESS_AGE_WEIGHT * lt.age_ticks
-        + FITNESS_FAILED_WEIGHT * lt.failed_actions
+        config.FITNESS_FOOD_WEIGHT * lt.food_eaten
+        + config.FITNESS_AGE_WEIGHT * lt.age_ticks
+        + config.FITNESS_FAILED_WEIGHT * lt.failed_actions
     )
 
 
@@ -129,14 +124,14 @@ def mutate_genome(genome: Genome, rng: random.Random) -> Genome:
 
     # Mutate individual genes
     for gene in genome.genes:
-        if rng.random() < MUTATION_RATE:
+        if rng.random() < config.MUTATION_RATE:
             mutation = rng.choice(['pattern', 'action', 'priority'])
             if mutation == 'pattern':
                 gene.pattern = _mutate_gene_pattern(gene.pattern, rng)
             elif mutation == 'action':
                 gene.action = rng.choice(list(ActionType))
             elif mutation == 'priority':
-                gene.base_priority += rng.uniform(-PARAM_MUTATION_DELTA * 4, PARAM_MUTATION_DELTA * 4)
+                gene.base_priority += rng.uniform(-config.PARAM_MUTATION_DELTA * 4, config.PARAM_MUTATION_DELTA * 4)
 
     # Occasionally add or remove a gene
     if rng.random() < 0.05 and len(genome.genes) < 20:
@@ -148,20 +143,20 @@ def mutate_genome(genome: Genome, rng: random.Random) -> Genome:
             base_priority=0.0,
         )
         genome.genes.append(new_gene)
-        if DEBUG_EVOLUTION:
+        if config.DEBUG_EVOLUTION:
             debug_log(f"Mutation: added gene {new_id}")
     elif rng.random() < 0.05 and len(genome.genes) > 3:
         removed = genome.genes.pop(rng.randrange(len(genome.genes)))
-        if DEBUG_EVOLUTION:
+        if config.DEBUG_EVOLUTION:
             debug_log(f"Mutation: removed gene {removed.gene_id}")
 
     # Mutate genome-level float parameters
-    if rng.random() < PARAM_MUTATION_RATE:
-        genome.learning_rate = max(0.01, genome.learning_rate + rng.uniform(-PARAM_MUTATION_DELTA, PARAM_MUTATION_DELTA))
-    if rng.random() < PARAM_MUTATION_RATE:
-        genome.reward_decay = max(0.1, min(0.99, genome.reward_decay + rng.uniform(-PARAM_MUTATION_DELTA, PARAM_MUTATION_DELTA)))
-    if rng.random() < PARAM_MUTATION_RATE:
-        genome.exploration_rate = max(0.0, min(0.5, genome.exploration_rate + rng.uniform(-PARAM_MUTATION_DELTA, PARAM_MUTATION_DELTA)))
+    if rng.random() < config.PARAM_MUTATION_RATE:
+        genome.learning_rate = max(0.01, genome.learning_rate + rng.uniform(-config.PARAM_MUTATION_DELTA, config.PARAM_MUTATION_DELTA))
+    if rng.random() < config.PARAM_MUTATION_RATE:
+        genome.reward_decay = max(0.1, min(0.99, genome.reward_decay + rng.uniform(-config.PARAM_MUTATION_DELTA, config.PARAM_MUTATION_DELTA)))
+    if rng.random() < config.PARAM_MUTATION_RATE:
+        genome.exploration_rate = max(0.0, min(0.5, genome.exploration_rate + rng.uniform(-config.PARAM_MUTATION_DELTA, config.PARAM_MUTATION_DELTA)))
 
     return genome
 
@@ -181,8 +176,8 @@ def evolve_next_generation(
     if population_size == 0:
         return [make_random_genome(rng) for _ in range(10)]
 
-    n_elite = max(1, round(population_size * ELITE_FRACTION))
-    n_random = max(1, round(population_size * RANDOM_NEW_FRACTION))
+    n_elite = max(1, round(population_size * config.ELITE_FRACTION))
+    n_random = max(1, round(population_size * config.RANDOM_NEW_FRACTION))
     n_offspring = population_size - n_elite - n_random
 
     # Map creature_id → genome
@@ -192,7 +187,7 @@ def evolve_next_generation(
     elite_ids = [r.creature_id for r in results[:n_elite]]
     elite_genomes = [copy.deepcopy(genome_map[cid]) for cid in elite_ids]
 
-    if DEBUG_EVOLUTION:
+    if config.DEBUG_EVOLUTION:
         top = results[0] if results else None
         fitness_str = f"top_fitness={top.fitness:.2f}" if top else "no results"
         log(
@@ -210,7 +205,7 @@ def evolve_next_generation(
         offspring_genomes.append(child)
 
     # Fresh random creatures
-    random_genomes = [make_random_genome(rng, gene_count=INITIAL_GENE_COUNT) for _ in range(n_random)]
+    random_genomes = [make_random_genome(rng, gene_count=config.INITIAL_GENE_COUNT) for _ in range(n_random)]
 
     next_gen = elite_genomes + offspring_genomes + random_genomes
     # Re-assign gene ids to be sequential within each genome
