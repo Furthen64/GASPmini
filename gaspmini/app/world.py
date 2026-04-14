@@ -1,0 +1,235 @@
+# app/world.py
+# World generation and grid helpers for GASPmini v1.
+# Biome is regenerated fresh each epoch.
+
+from __future__ import annotations
+
+import random
+from typing import Optional
+
+from app.config import (
+    GRID_WIDTH, GRID_HEIGHT,
+    POPULATION_SIZE, FOOD_COUNT, INTERIOR_WALL_COUNT,
+    INITIAL_ENERGY, DEFAULT_SEED,
+    DEFAULT_LEARNING_RATE, DEFAULT_REWARD_DECAY,
+    DEFAULT_EXPLORATION_RATE, INITIAL_GENE_COUNT, HISTORY_LENGTH,
+)
+from app.models import (
+    CellType, Direction, ActionType,
+    Gene, GenePattern, Genome, LifetimeState, Creature, WorldState,
+)
+
+
+# ── RNG helper ────────────────────────────────────────────────────────────────
+
+def make_rng(seed: int) -> random.Random:
+    return random.Random(seed)
+
+
+# ── Grid position helpers ─────────────────────────────────────────────────────
+
+def is_inside(world: WorldState, x: int, y: int) -> bool:
+    return 0 <= x < world.width and 0 <= y < world.height
+
+
+def is_walkable(world: WorldState, x: int, y: int) -> bool:
+    """True if the cell is inside the grid and not a wall."""
+    return is_inside(world, x, y) and (x, y) not in world.walls
+
+
+def get_cell_type(world: WorldState, x: int, y: int) -> CellType:
+    """Return the CellType at (x, y).  Creatures take priority over food."""
+    if not is_inside(world, x, y):
+        return CellType.WALL
+    if (x, y) in world.walls:
+        return CellType.WALL
+    creature_positions = {(c.lifetime.x, c.lifetime.y) for c in world.creatures if c.lifetime.alive}
+    if (x, y) in creature_positions:
+        return CellType.CREATURE
+    if (x, y) in world.food_positions:
+        return CellType.FOOD
+    return CellType.EMPTY
+
+
+def creature_at(world: WorldState, x: int, y: int) -> Optional[Creature]:
+    """Return the living creature at (x, y) or None."""
+    for c in world.creatures:
+        if c.lifetime.alive and c.lifetime.x == x and c.lifetime.y == y:
+            return c
+    return None
+
+
+# ── ASCII debug render ────────────────────────────────────────────────────────
+
+CELL_SYMBOLS = {
+    CellType.EMPTY: '.',
+    CellType.WALL: '#',
+    CellType.FOOD: 'F',
+    CellType.CREATURE: 'C',
+}
+
+
+def render_ascii(world: WorldState) -> str:
+    """Return a multi-line ASCII string of the current world."""
+    lines: list[str] = []
+    for y in range(world.height):
+        row = ''
+        for x in range(world.width):
+            ct = get_cell_type(world, x, y)
+            row += CELL_SYMBOLS[ct]
+        lines.append(row)
+    return '\n'.join(lines)
+
+
+# ── Biome generation ──────────────────────────────────────────────────────────
+
+def _place_border_walls(world: WorldState) -> None:
+    """Fill the outermost ring with walls."""
+    for x in range(world.width):
+        world.walls.add((x, 0))
+        world.walls.add((x, world.height - 1))
+    for y in range(1, world.height - 1):
+        world.walls.add((0, y))
+        world.walls.add((world.width - 1, y))
+
+
+def _place_interior_walls(world: WorldState, count: int, rng: random.Random) -> None:
+    """Place random interior walls (not on border)."""
+    placed = 0
+    attempts = 0
+    while placed < count and attempts < count * 10:
+        x = rng.randint(1, world.width - 2)
+        y = rng.randint(1, world.height - 2)
+        if (x, y) not in world.walls:
+            world.walls.add((x, y))
+            placed += 1
+        attempts += 1
+
+
+def spawn_food(world: WorldState, food_count: int, rng: random.Random) -> None:
+    """Place food cells on non-wall, non-occupied cells."""
+    placed = 0
+    attempts = 0
+    occupied = world.walls.copy()
+    while placed < food_count and attempts < food_count * 20:
+        x = rng.randint(1, world.width - 2)
+        y = rng.randint(1, world.height - 2)
+        if (x, y) not in occupied:
+            world.food_positions.add((x, y))
+            occupied.add((x, y))
+            placed += 1
+        attempts += 1
+
+
+def _make_random_gene_pattern(rng: random.Random) -> GenePattern:
+    """Create a gene pattern with random fields or wildcards."""
+    cell_types = list(CellType)
+    actions = list(ActionType)
+
+    def rand_cell() -> Optional[CellType]:
+        return rng.choice(cell_types) if rng.random() < 0.6 else None
+
+    def rand_action() -> Optional[ActionType]:
+        return rng.choice(actions) if rng.random() < 0.4 else None
+
+    def rand_bool() -> Optional[bool]:
+        return rng.choice([True, False]) if rng.random() < 0.4 else None
+
+    def rand_hunger() -> Optional[int]:
+        return rng.randint(0, 3) if rng.random() < 0.4 else None
+
+    return GenePattern(
+        front_cell=rand_cell(),
+        left_cell=rand_cell(),
+        right_cell=rand_cell(),
+        back_cell=rand_cell(),
+        last_action=rand_action(),
+        last_action_success=rand_bool(),
+        hunger_bucket=rand_hunger(),
+    )
+
+
+def make_random_genome(rng: random.Random, gene_count: int = INITIAL_GENE_COUNT) -> Genome:
+    """Create a genome with random genes and slightly varied parameters."""
+    genes = [
+        Gene(
+            gene_id=i,
+            pattern=_make_random_gene_pattern(rng),
+            action=rng.choice(list(ActionType)),
+            base_priority=rng.uniform(-0.5, 0.5),
+        )
+        for i in range(gene_count)
+    ]
+    return Genome(
+        genes=genes,
+        learning_rate=max(0.01, DEFAULT_LEARNING_RATE + rng.uniform(-0.05, 0.05)),
+        reward_decay=max(0.1, min(0.99, DEFAULT_REWARD_DECAY + rng.uniform(-0.05, 0.05))),
+        exploration_rate=max(0.0, DEFAULT_EXPLORATION_RATE + rng.uniform(-0.02, 0.02)),
+        history_length=HISTORY_LENGTH,
+    )
+
+
+def spawn_creatures(
+    world: WorldState,
+    genomes: list[Genome],
+    rng: random.Random,
+) -> None:
+    """Spawn creatures with the given genomes at random free positions."""
+    occupied = world.walls | world.food_positions
+    positions: list[tuple[int, int]] = []
+    attempts = 0
+    while len(positions) < len(genomes) and attempts < len(genomes) * 100:
+        x = rng.randint(1, world.width - 2)
+        y = rng.randint(1, world.height - 2)
+        pos = (x, y)
+        if pos not in occupied and pos not in set(positions):
+            positions.append(pos)
+        attempts += 1
+
+    for idx, genome in enumerate(genomes):
+        if idx >= len(positions):
+            break
+        x, y = positions[idx]
+        lifetime = LifetimeState(
+            x=x,
+            y=y,
+            direction=rng.choice(list(Direction)),
+            energy=float(INITIAL_ENERGY),
+        )
+        world.creatures.append(Creature(
+            creature_id=idx,
+            genome=genome,
+            lifetime=lifetime,
+        ))
+
+
+def generate_world(
+    epoch_index: int = 0,
+    seed: int = DEFAULT_SEED,
+    genomes: Optional[list[Genome]] = None,
+    population_size: int = POPULATION_SIZE,
+    food_count: int = FOOD_COUNT,
+    interior_wall_count: int = INTERIOR_WALL_COUNT,
+    width: int = GRID_WIDTH,
+    height: int = GRID_HEIGHT,
+) -> WorldState:
+    """Create a fresh world for the given epoch."""
+    # Use epoch-derived seed so each epoch has a different but reproducible layout.
+    rng = make_rng(seed + epoch_index * 1000)
+
+    world = WorldState(
+        width=width,
+        height=height,
+        random_seed=seed,
+        epoch_index=epoch_index,
+    )
+
+    _place_border_walls(world)
+    _place_interior_walls(world, interior_wall_count, rng)
+    spawn_food(world, food_count, rng)
+
+    if genomes is None:
+        genomes = [make_random_genome(rng) for _ in range(population_size)]
+
+    spawn_creatures(world, genomes, rng)
+    return world
