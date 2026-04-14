@@ -198,6 +198,14 @@ class MainWindow(QMainWindow):
         seed_layout.addWidget(btn_new_seed)
         ctrl_layout.addLayout(seed_layout)
 
+        # Ticks per epoch control
+        tpe_layout = QHBoxLayout()
+        tpe_layout.addWidget(QLabel("Ticks/Epoch:"))
+        self._tpe_edit = QLineEdit(str(self._sim.ticks_per_epoch))
+        self._tpe_edit.setFixedWidth(80)
+        tpe_layout.addWidget(self._tpe_edit)
+        ctrl_layout.addLayout(tpe_layout)
+
         right_layout.addWidget(ctrl_group)
 
         # Selected creature info
@@ -226,7 +234,7 @@ class MainWindow(QMainWindow):
             return
 
         self._lbl_epoch.setText(f"Epoch: {world.epoch_index}")
-        self._lbl_tick.setText(f"Tick: {world.tick_index} / {TICKS_PER_EPOCH}")
+        self._lbl_tick.setText(f"Tick: {world.tick_index} / {self._sim.ticks_per_epoch}")
         self._lbl_alive.setText(f"Alive: {self._sim.alive_count()} / {len(world.creatures)}")
 
         # Keep selected creature reference fresh
@@ -339,6 +347,15 @@ class MainWindow(QMainWindow):
             seed = int(seed_text)
         except ValueError:
             seed = None
+        tpe_text = self._tpe_edit.text().strip()
+        try:
+            tpe = int(tpe_text)
+            if 1 <= tpe <= 10_000:
+                self._sim.ticks_per_epoch = tpe
+            else:
+                self._tpe_edit.setText(str(self._sim.ticks_per_epoch))
+        except ValueError:
+            self._tpe_edit.setText(str(self._sim.ticks_per_epoch))
         self._selected_creature = None
         self._grid_widget.set_selected(None)
         self._sim.reset(seed=seed)
