@@ -15,6 +15,7 @@ from app.evolution import (
     compute_fitness, collect_epoch_results, evolve_next_generation,
     mutate_genome,
 )
+from app.simulation_runner import SimulationRunner
 from app.world import make_rng
 
 
@@ -141,6 +142,58 @@ class TestEvolution(unittest.TestCase):
         results = collect_epoch_results(world)
         next_gen = evolve_next_generation(world, results, rng)
         self.assertGreater(len(next_gen), 0)
+
+    def test_best_ever_genome_is_reinserted_across_epochs(self):
+        sim = SimulationRunner(seed=5, ticks_per_epoch=1)
+
+        champion = _make_genome(7)
+        contender = _make_genome(5)
+        world0 = WorldState(width=10, height=10, tick_index=1, epoch_index=0)
+        world0.creatures = [
+            _make_creature(0, food_eaten=10, age_ticks=100),
+            _make_creature(1, food_eaten=1, age_ticks=10),
+        ]
+        world0.creatures[0].genome = champion
+        world0.creatures[1].genome = contender
+        sim.world = world0
+
+        sim.step_epoch()
+
+        weaker_a = _make_genome(5)
+        weaker_b = _make_genome(3)
+        world1 = WorldState(width=10, height=10, tick_index=1, epoch_index=1)
+        world1.creatures = [
+            _make_creature(0, food_eaten=2, age_ticks=20),
+            _make_creature(1, food_eaten=1, age_ticks=10),
+        ]
+        world1.creatures[0].genome = weaker_a
+        world1.creatures[1].genome = weaker_b
+        sim.world = world1
+
+        sim.step_epoch()
+
+        self.assertIsNotNone(sim.best_genome_ever)
+        self.assertEqual(len(sim.best_genome_ever.genes), 7)
+        self.assertTrue(any(len(c.genome.genes) == 7 for c in sim.world.creatures))
+
+    def test_epoch_history_records_best_fitness(self):
+        sim = SimulationRunner(seed=11, ticks_per_epoch=1)
+        world = WorldState(width=10, height=10, tick_index=1, epoch_index=0)
+        world.creatures = [
+            _make_creature(0, food_eaten=4, age_ticks=10),
+            _make_creature(1, food_eaten=1, age_ticks=10),
+        ]
+        sim.world = world
+
+        sim.step_epoch()
+
+        self.assertEqual(len(sim.epoch_history), 1)
+        self.assertEqual(sim.epoch_history[0]['epoch'], 0)
+        self.assertEqual(sim.epoch_history[0]['top_creature_id'], 0)
+        self.assertAlmostEqual(sim.epoch_history[0]['top_fitness'], compute_fitness(world.creatures[0]))
+        self.assertEqual(sim.epoch_best_fitnesses(), [(0, sim.epoch_history[0]['top_fitness'])])
+        self.assertEqual(sim.best_epoch_ever, 0)
+        self.assertAlmostEqual(sim.best_fitness_ever, sim.epoch_history[0]['top_fitness'])
 
 
 if __name__ == '__main__':

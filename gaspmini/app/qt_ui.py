@@ -35,6 +35,7 @@ CELL_COLORS = {
 SELECTED_COLOR = QColor(255, 200, 0)
 GRID_LINE_COLOR = QColor(50, 50, 50)
 CELL_SIZE = 22   # pixels per cell
+EPOCH_HISTORY_WINDOW = 6
 
 
 # ── Grid widget ────────────────────────────────────────────────────────────────
@@ -167,6 +168,15 @@ class MainWindow(QMainWindow):
             status_layout.addWidget(lbl)
         right_layout.addWidget(status_group)
 
+        history_group = QGroupBox("Epoch Bests")
+        history_layout = QVBoxLayout(history_group)
+        self._epoch_history_text = QTextEdit()
+        self._epoch_history_text.setReadOnly(True)
+        self._epoch_history_text.setFixedHeight(120)
+        self._epoch_history_text.setFont(QFont("Courier", 8))
+        history_layout.addWidget(self._epoch_history_text)
+        right_layout.addWidget(history_group)
+
         # Controls
         ctrl_group = QGroupBox("Controls")
         ctrl_layout = QVBoxLayout(ctrl_group)
@@ -236,6 +246,7 @@ class MainWindow(QMainWindow):
         self._lbl_epoch.setText(f"Epoch: {world.epoch_index}")
         self._lbl_tick.setText(f"Tick: {world.tick_index} / {self._sim.ticks_per_epoch}")
         self._lbl_alive.setText(f"Alive: {self._sim.alive_count()} / {len(world.creatures)}")
+        self._refresh_epoch_history()
 
         # Keep selected creature reference fresh
         if self._selected_creature is not None:
@@ -246,6 +257,35 @@ class MainWindow(QMainWindow):
 
         self._grid_widget._update_size()
         self._grid_widget.update()
+
+    def _refresh_epoch_history(self) -> None:
+        history = self._sim.epoch_history
+        if not history:
+            self._epoch_history_text.setPlainText("(no completed epochs yet)")
+            return
+
+        lines: list[str] = []
+        if self._sim.best_fitness_ever is not None and self._sim.best_epoch_ever is not None:
+            lines.append(
+                f"All-time best: {self._sim.best_fitness_ever:.2f} "
+                f"(epoch {self._sim.best_epoch_ever})"
+            )
+            lines.append("")
+
+        if len(history) <= EPOCH_HISTORY_WINDOW:
+            visible = history
+        else:
+            rotation_start = 0
+            if self._sim.world is not None:
+                rotation_start = self._sim.world.epoch_index % len(history)
+            visible = history[rotation_start:] + history[:rotation_start]
+            visible = visible[:EPOCH_HISTORY_WINDOW]
+
+        lines.extend(
+            f"Epoch {entry['epoch']}: best {entry['top_fitness']:.2f}"
+            for entry in visible
+        )
+        self._epoch_history_text.setPlainText('\n'.join(lines))
 
     def _refresh_creature_info(self) -> None:
         c = self._selected_creature
