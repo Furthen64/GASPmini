@@ -350,10 +350,12 @@ class MainWindow(QMainWindow):
         tpe_text = self._tpe_edit.text().strip()
         try:
             tpe = int(tpe_text)
-            if tpe > 0:
+            if 1 <= tpe <= 10_000:
                 self._sim.ticks_per_epoch = tpe
+            else:
+                self._tpe_edit.setText(str(self._sim.ticks_per_epoch))
         except ValueError:
-            pass
+            self._tpe_edit.setText(str(self._sim.ticks_per_epoch))
         self._selected_creature = None
         self._grid_widget.set_selected(None)
         self._sim.reset(seed=seed)
