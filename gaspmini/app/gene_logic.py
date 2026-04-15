@@ -37,7 +37,7 @@ def _expected_food_flag(cell_pattern) -> int | None:
     return 1 if cell_pattern.name == "FOOD" else 0
 
 
-def _expected_front_blocked_flag(cell_pattern) -> int | None:
+def _expected_blocked_flag(cell_pattern) -> int | None:
     if cell_pattern is None:
         return None
     return 1 if cell_pattern.name in {"WALL", "CREATURE"} else 0
@@ -45,10 +45,14 @@ def _expected_front_blocked_flag(cell_pattern) -> int | None:
 
 def _score_history_tuple(pattern: GenePattern, history: HistoryTuple) -> float:
     total = 0.0
-    total += _score_field(_expected_food_flag(pattern.front_cell), history.food_ahead)
-    total += _score_field(_expected_food_flag(pattern.left_cell), history.food_left)
-    total += _score_field(_expected_food_flag(pattern.right_cell), history.food_right)
-    total += _score_field(_expected_front_blocked_flag(pattern.front_cell), history.front_blocked)
+    total += _score_field(_expected_food_flag(pattern.north_cell), history.food_north)
+    total += _score_field(_expected_food_flag(pattern.east_cell), history.food_east)
+    total += _score_field(_expected_food_flag(pattern.south_cell), history.food_south)
+    total += _score_field(_expected_food_flag(pattern.west_cell), history.food_west)
+    total += _score_field(_expected_blocked_flag(pattern.north_cell), history.north_blocked)
+    total += _score_field(_expected_blocked_flag(pattern.east_cell), history.east_blocked)
+    total += _score_field(_expected_blocked_flag(pattern.south_cell), history.south_blocked)
+    total += _score_field(_expected_blocked_flag(pattern.west_cell), history.west_blocked)
     total += _score_field(pattern.hunger_bucket, history.hunger_bucket)
     expected_action_code = None if pattern.last_action is None else action_to_code(pattern.last_action)
     total += _score_field(expected_action_code, history.previous_action_code)

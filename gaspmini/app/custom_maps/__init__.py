@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.custom_maps import hidden_food
+from app.custom_maps import hidden_food, simple_1
 
 
 @dataclass(frozen=True)
@@ -54,6 +54,11 @@ _CUSTOM_MAPS: tuple[CustomMapDefinition, ...] = (
         hidden_food.MAP_ID,
         hidden_food.LABEL,
         hidden_food.LAYOUT_ROWS,
+    ),
+    _build_definition(
+        simple_1.MAP_ID,
+        simple_1.LABEL,
+        simple_1.LAYOUT_ROWS,
     ),
 )
 

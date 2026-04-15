@@ -6,11 +6,11 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from app.models import ActionType, CellType, Creature, Direction, Gene, GenePattern, Genome, LifetimeState, WorldState
+from app.models import ActionType, CellType, Creature, Gene, GenePattern, Genome, LifetimeState, WorldState
 from app.sensors import build_sensor_data
 
 
-def _make_creature(x: int = 3, y: int = 3, direction: Direction = Direction.NORTH) -> Creature:
+def _make_creature(x: int = 3, y: int = 3) -> Creature:
     genome = Genome(
         genes=[
             Gene(
@@ -21,7 +21,7 @@ def _make_creature(x: int = 3, y: int = 3, direction: Direction = Direction.NORT
             )
         ]
     )
-    lifetime = LifetimeState(x=x, y=y, direction=direction, energy=30.0)
+    lifetime = LifetimeState(x=x, y=y, energy=30.0)
     return Creature(creature_id=0, genome=genome, lifetime=lifetime)
 
 
@@ -35,8 +35,8 @@ class TestSensors(unittest.TestCase):
 
         self.assertEqual(sensor.current_cell, CellType.FOOD)
 
-    def test_sensor_reports_adjacent_food_by_direction(self):
-        creature = _make_creature(direction=Direction.NORTH)
+    def test_sensor_reports_adjacent_food_by_cardinal_direction(self):
+        creature = _make_creature()
         world = WorldState(
             width=8,
             height=8,
@@ -46,10 +46,10 @@ class TestSensors(unittest.TestCase):
 
         sensor = build_sensor_data(creature, world)
 
-        self.assertEqual(sensor.front_cell, CellType.FOOD)
-        self.assertEqual(sensor.left_cell, CellType.FOOD)
-        self.assertEqual(sensor.right_cell, CellType.FOOD)
-        self.assertEqual(sensor.back_cell, CellType.FOOD)
+        self.assertEqual(sensor.north_cell, CellType.FOOD)
+        self.assertEqual(sensor.east_cell, CellType.FOOD)
+        self.assertEqual(sensor.south_cell, CellType.FOOD)
+        self.assertEqual(sensor.west_cell, CellType.FOOD)
 
 
 if __name__ == '__main__':

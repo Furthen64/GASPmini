@@ -44,10 +44,10 @@ def _gene_to_dict(gene: Gene) -> dict:
         'base_priority': gene.base_priority,
         'pattern': {
             'current_cell': _enum_name(gene.pattern.current_cell),
-            'front_cell': _enum_name(gene.pattern.front_cell),
-            'left_cell': _enum_name(gene.pattern.left_cell),
-            'right_cell': _enum_name(gene.pattern.right_cell),
-            'back_cell': _enum_name(gene.pattern.back_cell),
+            'north_cell': _enum_name(gene.pattern.north_cell),
+            'east_cell': _enum_name(gene.pattern.east_cell),
+            'south_cell': _enum_name(gene.pattern.south_cell),
+            'west_cell': _enum_name(gene.pattern.west_cell),
             'last_action': _enum_name(gene.pattern.last_action),
             'last_action_success': gene.pattern.last_action_success,
             'hunger_bucket': gene.pattern.hunger_bucket,
@@ -67,16 +67,19 @@ def _genome_from_dict(data: dict) -> Genome:
 
 def _gene_from_dict(data: dict) -> Gene:
     pattern = data['pattern']
+    legacy_direction_fields = {'front_cell', 'left_cell', 'right_cell', 'back_cell'}
+    if legacy_direction_fields & set(pattern):
+        raise ValueError('Saved genomes using facing-relative sensor fields are no longer supported.')
     return Gene(
         gene_id=int(data['gene_id']),
         action=_action_type(data['action']),
         base_priority=float(data['base_priority']),
         pattern=GenePattern(
             current_cell=_cell_type_or_none(pattern['current_cell']),
-            front_cell=_cell_type_or_none(pattern['front_cell']),
-            left_cell=_cell_type_or_none(pattern['left_cell']),
-            right_cell=_cell_type_or_none(pattern['right_cell']),
-            back_cell=_cell_type_or_none(pattern['back_cell']),
+            north_cell=_cell_type_or_none(pattern['north_cell']),
+            east_cell=_cell_type_or_none(pattern['east_cell']),
+            south_cell=_cell_type_or_none(pattern['south_cell']),
+            west_cell=_cell_type_or_none(pattern['west_cell']),
             last_action=_action_type_or_none(pattern['last_action']),
             last_action_success=pattern['last_action_success'],
             hunger_bucket=pattern['hunger_bucket'],

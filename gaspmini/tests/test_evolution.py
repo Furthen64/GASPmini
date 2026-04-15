@@ -10,7 +10,7 @@ import tempfile
 
 import app.config as config
 from app.models import (
-    ActionType, CellType, Direction,
+    ActionType, CellType,
     Gene, GenePattern, Genome, LifetimeState, Creature, WorldState,
 )
 from app.evolution import (
@@ -48,7 +48,6 @@ def _make_creature(
 ) -> Creature:
     lt = LifetimeState(
         x=1, y=1,
-        direction=Direction.NORTH,
         energy=30.0,
         food_eaten=food_eaten,
         age_ticks=age_ticks,

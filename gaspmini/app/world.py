@@ -10,7 +10,7 @@ from typing import Optional
 import app.config as config
 from app.custom_maps import get_custom_map
 from app.models import (
-    CellType, Direction, ActionType,
+    CellType, ActionType,
     Gene, GenePattern, Genome, LifetimeState, Creature, WorldState, RunHistorySample, HistoryBuffer,
 )
 
@@ -144,10 +144,10 @@ def _make_random_gene_pattern(rng: random.Random) -> GenePattern:
 
     return GenePattern(
         current_cell=rand_cell(),
-        front_cell=rand_cell(),
-        left_cell=rand_cell(),
-        right_cell=rand_cell(),
-        back_cell=rand_cell(),
+        north_cell=rand_cell(),
+        east_cell=rand_cell(),
+        south_cell=rand_cell(),
+        west_cell=rand_cell(),
         last_action=rand_action(),
         last_action_success=rand_bool(),
         hunger_bucket=rand_hunger(),
@@ -201,7 +201,6 @@ def spawn_creatures(
         lifetime = LifetimeState(
             x=x,
             y=y,
-            direction=rng.choice(list(Direction)),
             energy=float(config.INITIAL_ENERGY),
             history_buffer=HistoryBuffer(config.SENSOR_HISTORY_CONTEXT_LENGTH),
         )

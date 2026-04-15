@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import unittest
 
 from app.models import (
-    ActionType, CellType, Direction,
+    ActionType, CellType,
     Gene, GenePattern, Genome, LifetimeState, Creature, SensorField, HistoryEntry,
 )
 from app.learning import apply_reward_to_history, record_history
@@ -35,7 +35,6 @@ def _make_creature(
     )
     lifetime = LifetimeState(
         x=5, y=5,
-        direction=Direction.NORTH,
         energy=30.0,
     )
     return Creature(creature_id=0, genome=genome, lifetime=lifetime)
@@ -44,10 +43,10 @@ def _make_creature(
 def _dummy_sensor() -> SensorField:
     return SensorField(
         current_cell=CellType.EMPTY,
-        front_cell=CellType.EMPTY,
-        left_cell=CellType.EMPTY,
-        right_cell=CellType.EMPTY,
-        back_cell=CellType.EMPTY,
+        north_cell=CellType.EMPTY,
+        east_cell=CellType.EMPTY,
+        south_cell=CellType.EMPTY,
+        west_cell=CellType.EMPTY,
         last_action=ActionType.IDLE,
         last_action_success=True,
         hunger_bucket=0,
@@ -69,10 +68,10 @@ def _add_history(creature: Creature, gene_id: int, tick: int, reward: float = 0.
 def _food_sensor() -> SensorField:
     return SensorField(
         current_cell=CellType.EMPTY,
-        front_cell=CellType.FOOD,
-        left_cell=CellType.EMPTY,
-        right_cell=CellType.EMPTY,
-        back_cell=CellType.EMPTY,
+        north_cell=CellType.FOOD,
+        east_cell=CellType.EMPTY,
+        south_cell=CellType.EMPTY,
+        west_cell=CellType.EMPTY,
         last_action=ActionType.IDLE,
         last_action_success=True,
         hunger_bucket=0,
@@ -151,7 +150,6 @@ class TestLearning(unittest.TestCase):
         # Simulate new epoch: replace lifetime
         creature.lifetime = LifetimeState(
             x=1, y=1,
-            direction=Direction.NORTH,
             energy=30.0,
         )
         self.assertEqual(creature.lifetime.learned_gene_adjustments, {})

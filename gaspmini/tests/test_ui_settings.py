@@ -54,6 +54,7 @@ class TestUiSettings(unittest.TestCase):
                 profile_id='longer_strategic',
                 custom_map_id='hidden_food',
                 ticks_per_epoch=320,
+                ticks_per_second=24,
                 seed=12345,
                 testing_ground_enabled=True,
             )
@@ -64,6 +65,7 @@ class TestUiSettings(unittest.TestCase):
                 default_profile_id='short_chaotic',
                 default_custom_map_id='',
                 default_ticks_per_epoch=160,
+                default_ticks_per_second=10,
                 default_seed=42,
             )
 
@@ -76,6 +78,7 @@ class TestUiSettings(unittest.TestCase):
                     'profile_id': 'longer_strategic',
                     'custom_map_id': 'hidden_food',
                     'ticks_per_epoch': 320,
+                    'ticks_per_second': 24,
                     'seed': 12345,
                     'testing_ground_enabled': True,
                 },

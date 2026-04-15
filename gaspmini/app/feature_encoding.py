@@ -4,13 +4,13 @@ import app.config as config
 from app.models import CellType, GenePattern, SensorField
 
 # Compact encodings
-# relative food direction: 0=none, 1=ahead, 2=left, 3=right, 4=behind
+# cardinal food direction: 0=none, 1=north, 2=east, 3=south, 4=west
 # hunger tier: 0=low, 1=med, 2=high
 
-_FOOD_AHEAD = 1
-_FOOD_LEFT = 2
-_FOOD_RIGHT = 3
-_FOOD_BEHIND = 4
+_FOOD_NORTH = 1
+_FOOD_EAST = 2
+_FOOD_SOUTH = 3
+_FOOD_WEST = 4
 
 
 # ── Shared helpers ───────────────────────────────────────────────────────────
@@ -29,43 +29,43 @@ def _hunger_tier(bucket: int) -> int:
 
 
 def _food_direction_code(sensor: SensorField) -> int:
-    if sensor.front_cell == CellType.FOOD:
-        return _FOOD_AHEAD
-    if sensor.left_cell == CellType.FOOD:
-        return _FOOD_LEFT
-    if sensor.right_cell == CellType.FOOD:
-        return _FOOD_RIGHT
-    if sensor.back_cell == CellType.FOOD:
-        return _FOOD_BEHIND
+    if sensor.north_cell == CellType.FOOD:
+        return _FOOD_NORTH
+    if sensor.east_cell == CellType.FOOD:
+        return _FOOD_EAST
+    if sensor.south_cell == CellType.FOOD:
+        return _FOOD_SOUTH
+    if sensor.west_cell == CellType.FOOD:
+        return _FOOD_WEST
     return 0
 
 
 def _obstacle_mask(sensor: SensorField) -> int:
-    # 4-bit: front=1, left=2, right=4, back=8
+    # 4-bit: north=1, east=2, south=4, west=8
     mask = 0
-    if _is_blocked(sensor.front_cell):
+    if _is_blocked(sensor.north_cell):
         mask |= 0b0001
-    if _is_blocked(sensor.left_cell):
+    if _is_blocked(sensor.east_cell):
         mask |= 0b0010
-    if _is_blocked(sensor.right_cell):
+    if _is_blocked(sensor.south_cell):
         mask |= 0b0100
-    if _is_blocked(sensor.back_cell):
+    if _is_blocked(sensor.west_cell):
         mask |= 0b1000
     return mask
 
 
 def _nearby_creature(sensor: SensorField) -> int:
-    adjacent = (sensor.front_cell, sensor.left_cell, sensor.right_cell, sensor.back_cell)
+    adjacent = (sensor.north_cell, sensor.east_cell, sensor.south_cell, sensor.west_cell)
     return 1 if any(cell == CellType.CREATURE for cell in adjacent) else 0
 
 
 def encode_sensor_legacy(sensor: SensorField) -> tuple[object, ...]:
     return (
         sensor.current_cell,
-        sensor.front_cell,
-        sensor.left_cell,
-        sensor.right_cell,
-        sensor.back_cell,
+        sensor.north_cell,
+        sensor.east_cell,
+        sensor.south_cell,
+        sensor.west_cell,
         sensor.last_action,
         sensor.last_action_success,
         sensor.hunger_bucket,
@@ -83,10 +83,10 @@ def encode_sensor_compact(sensor: SensorField) -> tuple[object, ...]:
 
 def _pattern_food_direction_code(pattern: GenePattern) -> int | None:
     direction_fields = [
-        pattern.front_cell,
-        pattern.left_cell,
-        pattern.right_cell,
-        pattern.back_cell,
+        pattern.north_cell,
+        pattern.east_cell,
+        pattern.south_cell,
+        pattern.west_cell,
     ]
     food_directions = [i for i, cell in enumerate(direction_fields, start=1) if cell == CellType.FOOD]
 
@@ -102,7 +102,7 @@ def _pattern_food_direction_code(pattern: GenePattern) -> int | None:
 
 
 def _pattern_obstacle_mask(pattern: GenePattern) -> int | None:
-    direction_fields = [pattern.front_cell, pattern.left_cell, pattern.right_cell, pattern.back_cell]
+    direction_fields = [pattern.north_cell, pattern.east_cell, pattern.south_cell, pattern.west_cell]
     if any(cell is None for cell in direction_fields):
         return None
 
@@ -119,7 +119,7 @@ def _pattern_obstacle_mask(pattern: GenePattern) -> int | None:
 
 
 def _pattern_nearby_creature(pattern: GenePattern) -> int | None:
-    direction_fields = [pattern.front_cell, pattern.left_cell, pattern.right_cell, pattern.back_cell]
+    direction_fields = [pattern.north_cell, pattern.east_cell, pattern.south_cell, pattern.west_cell]
     if any(cell == CellType.CREATURE for cell in direction_fields):
         return 1
     if all(cell is not None and cell != CellType.CREATURE for cell in direction_fields):
@@ -136,10 +136,10 @@ def _pattern_hunger_tier(pattern: GenePattern) -> int | None:
 def encode_pattern_legacy(pattern: GenePattern) -> tuple[object, ...]:
     return (
         pattern.current_cell,
-        pattern.front_cell,
-        pattern.left_cell,
-        pattern.right_cell,
-        pattern.back_cell,
+        pattern.north_cell,
+        pattern.east_cell,
+        pattern.south_cell,
+        pattern.west_cell,
         pattern.last_action,
         pattern.last_action_success,
         pattern.hunger_bucket,

@@ -22,17 +22,11 @@ class CellType(Enum):
     CREATURE = auto()
 
 
-class Direction(Enum):
-    NORTH = auto()
-    EAST = auto()
-    SOUTH = auto()
-    WEST = auto()
-
-
 class ActionType(Enum):
-    MOVE_FORWARD = auto()
-    TURN_LEFT = auto()
-    TURN_RIGHT = auto()
+    MOVE_NORTH = auto()
+    MOVE_EAST = auto()
+    MOVE_SOUTH = auto()
+    MOVE_WEST = auto()
     IDLE = auto()
 
 
@@ -42,10 +36,10 @@ class ActionType(Enum):
 class SensorField:
     """Snapshot of what a creature currently perceives."""
     current_cell: CellType
-    front_cell: CellType
-    left_cell: CellType
-    right_cell: CellType
-    back_cell: CellType
+    north_cell: CellType
+    east_cell: CellType
+    south_cell: CellType
+    west_cell: CellType
     last_action: Optional[ActionType]
     last_action_success: bool
     # 0=full, 1=medium, 2=low, 3=critical
@@ -56,10 +50,10 @@ class SensorField:
 class GenePattern:
     """Pattern to match against a SensorField.  None means wildcard."""
     current_cell: Optional[CellType]
-    front_cell: Optional[CellType]
-    left_cell: Optional[CellType]
-    right_cell: Optional[CellType]
-    back_cell: Optional[CellType]
+    north_cell: Optional[CellType]
+    east_cell: Optional[CellType]
+    south_cell: Optional[CellType]
+    west_cell: Optional[CellType]
     last_action: Optional[ActionType]
     last_action_success: Optional[bool]
     hunger_bucket: Optional[int]
@@ -86,10 +80,11 @@ class Genome:
 
 _ACTION_CODE: dict[Optional[ActionType], int] = {
     None: 0,
-    ActionType.MOVE_FORWARD: 1,
-    ActionType.TURN_LEFT: 2,
-    ActionType.TURN_RIGHT: 3,
-    ActionType.IDLE: 4,
+    ActionType.MOVE_NORTH: 1,
+    ActionType.MOVE_EAST: 2,
+    ActionType.MOVE_SOUTH: 3,
+    ActionType.MOVE_WEST: 4,
+    ActionType.IDLE: 5,
 }
 
 
@@ -100,10 +95,14 @@ def action_to_code(action: Optional[ActionType]) -> int:
 
 @dataclass(frozen=True)
 class HistoryTuple:
-    food_ahead: int
-    food_left: int
-    food_right: int
-    front_blocked: int
+    food_north: int
+    food_east: int
+    food_south: int
+    food_west: int
+    north_blocked: int
+    east_blocked: int
+    south_blocked: int
+    west_blocked: int
     hunger_bucket: int
     previous_action_code: int
     previous_success_flag: int
@@ -131,10 +130,14 @@ class HistoryBuffer:
     def push(self, sensor: SensorField, action: ActionType, success: bool) -> None:
         """Append a compact context tuple for the tick."""
         self._entries.append(HistoryTuple(
-            food_ahead=self._is_food(sensor.front_cell),
-            food_left=self._is_food(sensor.left_cell),
-            food_right=self._is_food(sensor.right_cell),
-            front_blocked=self._is_blocked(sensor.front_cell),
+            food_north=self._is_food(sensor.north_cell),
+            food_east=self._is_food(sensor.east_cell),
+            food_south=self._is_food(sensor.south_cell),
+            food_west=self._is_food(sensor.west_cell),
+            north_blocked=self._is_blocked(sensor.north_cell),
+            east_blocked=self._is_blocked(sensor.east_cell),
+            south_blocked=self._is_blocked(sensor.south_cell),
+            west_blocked=self._is_blocked(sensor.west_cell),
             hunger_bucket=sensor.hunger_bucket,
             previous_action_code=action_to_code(action),
             previous_success_flag=1 if success else 0,
@@ -155,7 +158,7 @@ class HistoryBuffer:
                 item = recent[idx]
                 out.extend(dataclasses.astuple(item))
             else:
-                out.extend((0, 0, 0, 0, 0, 0, 0))
+                out.extend((0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
         return out
 
 
@@ -222,7 +225,6 @@ class LifetimeState:
     """Resets every epoch.  Not inherited."""
     x: int
     y: int
-    direction: Direction
     energy: float
     food_eaten: int = 0
     alive: bool = True

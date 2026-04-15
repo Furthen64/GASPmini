@@ -15,10 +15,10 @@ class TestFeatureEncoding(unittest.TestCase):
     def _sensor(self, **kwargs) -> SensorField:
         defaults = dict(
             current_cell=CellType.EMPTY,
-            front_cell=CellType.EMPTY,
-            left_cell=CellType.EMPTY,
-            right_cell=CellType.EMPTY,
-            back_cell=CellType.EMPTY,
+            north_cell=CellType.EMPTY,
+            east_cell=CellType.EMPTY,
+            south_cell=CellType.EMPTY,
+            west_cell=CellType.EMPTY,
             last_action=ActionType.IDLE,
             last_action_success=True,
             hunger_bucket=0,
@@ -29,10 +29,10 @@ class TestFeatureEncoding(unittest.TestCase):
     def _pattern(self, **kwargs) -> GenePattern:
         defaults = dict(
             current_cell=None,
-            front_cell=None,
-            left_cell=None,
-            right_cell=None,
-            back_cell=None,
+            north_cell=None,
+            east_cell=None,
+            south_cell=None,
+            west_cell=None,
             last_action=None,
             last_action_success=None,
             hunger_bucket=None,
@@ -45,14 +45,14 @@ class TestFeatureEncoding(unittest.TestCase):
         config.SENSOR_ENCODER_MODE = 'compact'
         try:
             sensor = self._sensor(
-                front_cell=CellType.WALL,
-                left_cell=CellType.CREATURE,
-                right_cell=CellType.FOOD,
-                back_cell=CellType.EMPTY,
+                north_cell=CellType.WALL,
+                east_cell=CellType.CREATURE,
+                south_cell=CellType.FOOD,
+                west_cell=CellType.EMPTY,
                 hunger_bucket=3,
             )
             encoded = encode_sensor_for_matching(sensor)
-            # food=right(3), obstacles front+left => 0b0011, creature nearby=1, high hunger=2
+            # food=south(3), obstacles north+east => 0b0011, creature nearby=1, high hunger=2
             self.assertEqual(encoded, (3, 0b0011, 1, 2))
         finally:
             config.SENSOR_ENCODER_MODE = old
@@ -62,17 +62,17 @@ class TestFeatureEncoding(unittest.TestCase):
         config.SENSOR_ENCODER_MODE = 'compact'
         try:
             sensor = self._sensor(
-                front_cell=CellType.FOOD,
-                left_cell=CellType.EMPTY,
-                right_cell=CellType.WALL,
-                back_cell=CellType.EMPTY,
+                north_cell=CellType.FOOD,
+                east_cell=CellType.EMPTY,
+                south_cell=CellType.WALL,
+                west_cell=CellType.EMPTY,
                 hunger_bucket=2,
             )
             pattern = self._pattern(
-                front_cell=CellType.FOOD,
-                left_cell=CellType.EMPTY,
-                right_cell=CellType.WALL,
-                back_cell=CellType.EMPTY,
+                north_cell=CellType.FOOD,
+                east_cell=CellType.EMPTY,
+                south_cell=CellType.WALL,
+                west_cell=CellType.EMPTY,
                 hunger_bucket=1,
             )
             # All 4 compact fields become concrete and should match.
@@ -85,7 +85,7 @@ class TestFeatureEncoding(unittest.TestCase):
         old = config.SENSOR_ENCODER_MODE
         config.SENSOR_ENCODER_MODE = 'legacy'
         try:
-            sensor = self._sensor(front_cell=CellType.FOOD)
+            sensor = self._sensor(north_cell=CellType.FOOD)
             encoded = encode_sensor_for_matching(sensor)
             self.assertEqual(len(encoded), 8)
             self.assertEqual(encoded[1], CellType.FOOD)

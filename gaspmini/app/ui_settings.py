@@ -11,6 +11,7 @@ AUTOSAVE_BEST_PATH_KEY = 'best_creature/autosave_path'
 PROFILE_ID_KEY = 'simulation/profile_id'
 CUSTOM_MAP_ID_KEY = 'simulation/custom_map_id'
 TICKS_PER_EPOCH_KEY = 'simulation/ticks_per_epoch'
+TICKS_PER_SECOND_KEY = 'simulation/ticks_per_second'
 SEED_KEY = 'simulation/seed'
 TESTING_GROUND_ENABLED_KEY = 'simulation/testing_ground_enabled'
 MAIN_WINDOW_GEOMETRY_KEY = 'ui/main_window_geometry'
@@ -50,6 +51,7 @@ def load_main_window_settings(
     default_profile_id: str,
     default_custom_map_id: str,
     default_ticks_per_epoch: int,
+    default_ticks_per_second: int,
     default_seed: int,
 ) -> dict[str, object]:
     values = load_best_creature_persistence_settings(settings)
@@ -57,6 +59,7 @@ def load_main_window_settings(
         'profile_id': str(settings.value(PROFILE_ID_KEY, default_profile_id)),
         'custom_map_id': str(settings.value(CUSTOM_MAP_ID_KEY, default_custom_map_id)),
         'ticks_per_epoch': _to_int(settings.value(TICKS_PER_EPOCH_KEY, default_ticks_per_epoch), default_ticks_per_epoch),
+        'ticks_per_second': _to_int(settings.value(TICKS_PER_SECOND_KEY, default_ticks_per_second), default_ticks_per_second),
         'seed': _to_int(settings.value(SEED_KEY, default_seed), default_seed),
         'testing_ground_enabled': _to_bool(settings.value(TESTING_GROUND_ENABLED_KEY, False)),
     })
@@ -80,6 +83,7 @@ def save_main_window_settings(
     profile_id: str,
     custom_map_id: str,
     ticks_per_epoch: int,
+    ticks_per_second: int,
     seed: int,
     testing_ground_enabled: bool,
     main_window_geometry: object = None,
@@ -96,6 +100,7 @@ def save_main_window_settings(
     settings.setValue(PROFILE_ID_KEY, profile_id)
     settings.setValue(CUSTOM_MAP_ID_KEY, custom_map_id)
     settings.setValue(TICKS_PER_EPOCH_KEY, ticks_per_epoch)
+    settings.setValue(TICKS_PER_SECOND_KEY, ticks_per_second)
     settings.setValue(SEED_KEY, seed)
     settings.setValue(TESTING_GROUND_ENABLED_KEY, testing_ground_enabled)
     if main_window_geometry is None:

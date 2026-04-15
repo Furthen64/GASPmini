@@ -90,23 +90,23 @@ def _mutate_gene_pattern(pattern: GenePattern, rng: random.Random) -> GenePatter
     bool_choices = [True, False, None]
 
     field = rng.choice([
-        'current_cell', 'front_cell', 'left_cell', 'right_cell', 'back_cell',
+        'current_cell', 'north_cell', 'east_cell', 'south_cell', 'west_cell',
         'last_action', 'last_action_success', 'hunger_bucket',
     ])
 
     # Build a plain dict of the current values, then change one field.
     vals = {
         'current_cell':        pattern.current_cell,
-        'front_cell':          pattern.front_cell,
-        'left_cell':           pattern.left_cell,
-        'right_cell':          pattern.right_cell,
-        'back_cell':           pattern.back_cell,
+        'north_cell':          pattern.north_cell,
+        'east_cell':           pattern.east_cell,
+        'south_cell':          pattern.south_cell,
+        'west_cell':           pattern.west_cell,
         'last_action':         pattern.last_action,
         'last_action_success': pattern.last_action_success,
         'hunger_bucket':       pattern.hunger_bucket,
     }
 
-    if field in ('current_cell', 'front_cell', 'left_cell', 'right_cell', 'back_cell'):
+    if field in ('current_cell', 'north_cell', 'east_cell', 'south_cell', 'west_cell'):
         vals[field] = rng.choice(cell_choices)
     elif field == 'last_action':
         vals[field] = rng.choice(action_choices)

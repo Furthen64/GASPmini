@@ -10,7 +10,6 @@ import app.config as config
 from app.models import (
     ActionType,
     Creature,
-    Direction,
     Gene,
     GenePattern,
     Genome,
@@ -24,7 +23,6 @@ from app.simulation import tick_creature
 def _make_creature(
     x: int = 2,
     y: int = 2,
-    direction: Direction = Direction.EAST,
     energy: float = 30.0,
     action: ActionType = ActionType.IDLE,
 ) -> Creature:
@@ -38,17 +36,17 @@ def _make_creature(
             )
         ]
     )
-    lifetime = LifetimeState(x=x, y=y, direction=direction, energy=energy)
+    lifetime = LifetimeState(x=x, y=y, energy=energy)
     return Creature(creature_id=0, genome=genome, lifetime=lifetime)
 
 
 class TestSimulation(unittest.TestCase):
 
-    def test_move_forward_onto_food_consumes_it(self):
+    def test_move_east_onto_food_consumes_it(self):
         creature = _make_creature()
         world = WorldState(width=8, height=8, food_positions={(3, 2)}, creatures=[creature])
 
-        result = execute_action(creature, ActionType.MOVE_FORWARD, world)
+        result = execute_action(creature, ActionType.MOVE_EAST, world)
 
         self.assertTrue(result.success)
         self.assertEqual((creature.lifetime.x, creature.lifetime.y), (3, 2))
@@ -81,16 +79,16 @@ class TestSimulation(unittest.TestCase):
         self.assertEqual(sample.food_eaten, 0)
         self.assertTrue(sample.alive)
 
-    def test_turning_counts_as_stationary_tick(self):
-        creature = _make_creature(action=ActionType.TURN_LEFT)
+    def test_idle_counts_as_stationary_tick(self):
+        creature = _make_creature(action=ActionType.IDLE)
         world = WorldState(width=8, height=8, creatures=[creature])
 
         tick_creature(creature, world)
 
         self.assertEqual(creature.lifetime.stationary_ticks, 1)
 
-    def test_move_forward_does_not_count_as_stationary_tick(self):
-        creature = _make_creature(action=ActionType.MOVE_FORWARD)
+    def test_move_east_does_not_count_as_stationary_tick(self):
+        creature = _make_creature(action=ActionType.MOVE_EAST)
         world = WorldState(width=8, height=8, creatures=[creature])
 
         tick_creature(creature, world)
@@ -98,7 +96,7 @@ class TestSimulation(unittest.TestCase):
         self.assertEqual(creature.lifetime.stationary_ticks, 0)
 
     def test_move_toward_food_has_no_reward_without_eating(self):
-        creature = _make_creature(action=ActionType.MOVE_FORWARD)
+        creature = _make_creature(action=ActionType.MOVE_EAST)
         creature.genome.reward_decay = 0.7
         world = WorldState(width=8, height=8, food_positions={(5, 2)}, creatures=[creature])
 
@@ -110,7 +108,7 @@ class TestSimulation(unittest.TestCase):
         self.assertEqual(entry.reward, 0.0)
 
     def test_eat_reward_is_only_positive_reward(self):
-        creature = _make_creature(action=ActionType.MOVE_FORWARD)
+        creature = _make_creature(action=ActionType.MOVE_EAST)
         creature.genome.reward_decay = 0.7
         world = WorldState(width=8, height=8, food_positions={(3, 2), (7, 2)}, creatures=[creature])
 

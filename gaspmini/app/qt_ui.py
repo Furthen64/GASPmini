@@ -11,7 +11,7 @@ from PySide6.QtCore import Qt, QTimer, QRectF, QSize, QSettings
 from PySide6.QtGui import QColor, QPainter, QFont, QMouseEvent, QPen, QCloseEvent
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
-    QPushButton, QLabel, QTextEdit, QLineEdit, QGroupBox, QComboBox,
+    QPushButton, QLabel, QTextEdit, QLineEdit, QGroupBox, QComboBox, QSlider,
     QSizePolicy, QCheckBox, QSplitter, QTabWidget, QDialog,
 )
 
@@ -42,6 +42,8 @@ SELECTED_COLOR = QColor(255, 200, 0)
 GRID_LINE_COLOR = QColor(50, 50, 50)
 CELL_SIZE = 22   # pixels per cell
 EPOCH_HISTORY_WINDOW = 6
+MIN_TICKS_PER_SECOND = 1
+MAX_TICKS_PER_SECOND = 60
 GRAPH_BG_COLOR = QColor(24, 24, 24)
 GRAPH_FRAME_COLOR = QColor(78, 78, 78)
 GRAPH_TEXT_COLOR = QColor(220, 220, 220)
@@ -51,7 +53,7 @@ FAIL_LINE_COLOR = QColor(255, 170, 70)
 DARK_BLUE_FITNESS_COLOR = QColor(18, 40, 110)
 BRIGHT_CYAN_FITNESS_COLOR = QColor(0, 255, 255)
 ACTION_MODEL_TEXT = (
-    "Actions: Move Forward, Turn Left, Turn Right, Idle. "
+    "Actions: Move North, Move East, Move South, Move West, Idle. "
     "Food is consumed automatically when a creature enters a food tile."
 )
 GRID_LEGEND_TEXT = (
@@ -427,7 +429,8 @@ class MainWindow(QMainWindow):
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._on_timer)
         self._running = False
-        self._timer_interval_ms = 100   # ms between ticks when running
+        self._ticks_per_second = 10
+        self._timer_interval_ms = self._timer_interval_for_tps(self._ticks_per_second)
 
         self._selected_creature: Optional[Creature] = None
         self._settings: QSettings = make_app_settings()
@@ -590,6 +593,22 @@ class MainWindow(QMainWindow):
         tpe_layout.addWidget(self._tpe_edit)
         ctrl_layout.addLayout(tpe_layout)
 
+        tps_layout = QVBoxLayout()
+        tps_header_layout = QHBoxLayout()
+        tps_header_layout.addWidget(QLabel("Ticks/Sec:"))
+        self._lbl_tps_value = QLabel(str(self._ticks_per_second))
+        self._lbl_tps_value.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        tps_header_layout.addWidget(self._lbl_tps_value)
+        tps_layout.addLayout(tps_header_layout)
+        self._tps_slider = QSlider(Qt.Orientation.Horizontal)
+        self._tps_slider.setRange(MIN_TICKS_PER_SECOND, MAX_TICKS_PER_SECOND)
+        self._tps_slider.setValue(self._ticks_per_second)
+        self._tps_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        self._tps_slider.setTickInterval(5)
+        self._tps_slider.valueChanged.connect(self._on_ticks_per_second_changed)
+        tps_layout.addWidget(self._tps_slider)
+        ctrl_layout.addLayout(tps_layout)
+
         persistence_group = QGroupBox("Best Creature Persistence")
         persistence_layout = QVBoxLayout(persistence_group)
         self._autosave_best_checkbox = QCheckBox("Autosave best creature")
@@ -709,7 +728,7 @@ class MainWindow(QMainWindow):
 
         lines: list[str] = [
             f"ID: {c.creature_id}",
-            f"Position: ({lt.x}, {lt.y})  Dir: {lt.direction.name}",
+            f"Position: ({lt.x}, {lt.y})",
             f"Energy: {lt.energy:.1f}",
             f"Food eaten: {lt.food_eaten}",
             f"Age ticks: {lt.age_ticks}",
@@ -732,10 +751,10 @@ class MainWindow(QMainWindow):
             lines += [
                 "── Sensor ──",
                 f"Current: {sensor.current_cell.name}",
-                f"Front: {sensor.front_cell.name}",
-                f"Left:  {sensor.left_cell.name}",
-                f"Right: {sensor.right_cell.name}",
-                f"Back:  {sensor.back_cell.name}",
+                f"North: {sensor.north_cell.name}",
+                f"East:  {sensor.east_cell.name}",
+                f"South: {sensor.south_cell.name}",
+                f"West:  {sensor.west_cell.name}",
                 f"Hunger bucket: {sensor.hunger_bucket}",
                 f"Last action: {_format_action_name(sensor.last_action)}",
                 f"Last success: {sensor.last_action_success}",
@@ -921,6 +940,14 @@ class MainWindow(QMainWindow):
             self._on_pause()
         self._refresh()
 
+    def _on_ticks_per_second_changed(self, value: int) -> None:
+        self._ticks_per_second = max(MIN_TICKS_PER_SECOND, min(MAX_TICKS_PER_SECOND, int(value)))
+        self._timer_interval_ms = self._timer_interval_for_tps(self._ticks_per_second)
+        self._lbl_tps_value.setText(str(self._ticks_per_second))
+        if self._running:
+            self._timer.start(self._timer_interval_ms)
+        self._save_ui_settings()
+
     def _on_testing_ground_toggled(self, checked: bool) -> None:
         self._on_pause()
 
@@ -962,6 +989,7 @@ class MainWindow(QMainWindow):
             default_profile_id=config.DEFAULT_PROFILE_ID,
             default_custom_map_id='',
             default_ticks_per_epoch=self._sim.ticks_per_epoch,
+            default_ticks_per_second=self._ticks_per_second,
             default_seed=self._sim.seed,
         )
 
@@ -977,6 +1005,8 @@ class MainWindow(QMainWindow):
         if custom_map_index >= 0:
             self._custom_map_combo.setCurrentIndex(custom_map_index)
         self._tpe_edit.setText(str(values['ticks_per_epoch']))
+        self._tps_slider.setValue(int(values['ticks_per_second']))
+        self._lbl_tps_value.setText(str(values['ticks_per_second']))
         self._seed_edit.setText(str(values['seed']))
         self._btn_testing_ground.blockSignals(True)
         self._btn_testing_ground.setChecked(False)
@@ -994,6 +1024,8 @@ class MainWindow(QMainWindow):
 
         ticks_per_epoch = self._parse_ticks_per_epoch_from_ui(default=self._sim.ticks_per_epoch)
         self._sim.ticks_per_epoch = ticks_per_epoch
+        self._ticks_per_second = max(MIN_TICKS_PER_SECOND, min(MAX_TICKS_PER_SECOND, int(values['ticks_per_second'])))
+        self._timer_interval_ms = self._timer_interval_for_tps(self._ticks_per_second)
         self._sync_persistence_settings_from_ui()
 
         seed = self._parse_seed_from_ui(default=self._sim.seed)
@@ -1036,6 +1068,7 @@ class MainWindow(QMainWindow):
             profile_id=str(self._profile_combo.currentData() or self._sim.profile_id),
             custom_map_id=str(self._custom_map_combo.currentData() or ''),
             ticks_per_epoch=self._parse_ticks_per_epoch_from_ui(default=self._sim.ticks_per_epoch),
+            ticks_per_second=self._ticks_per_second,
             seed=self._parse_seed_from_ui(default=self._sim.seed),
             testing_ground_enabled=self._sim.is_testing_ground(),
             main_window_geometry=self.saveGeometry(),
@@ -1044,6 +1077,9 @@ class MainWindow(QMainWindow):
             inspector_visible=self._inspector.isVisible(),
         )
         self._sync_persistence_settings_from_ui()
+
+    def _timer_interval_for_tps(self, ticks_per_second: int) -> int:
+        return max(1, round(1000 / max(1, ticks_per_second)))
 
     def _parse_seed_from_ui(self, default: int) -> int:
         seed_text = self._seed_edit.text().strip()

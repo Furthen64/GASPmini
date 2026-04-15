@@ -8,7 +8,7 @@ import unittest
 
 from app.models import (
     CellType, ActionType, SensorField, GenePattern,
-    LifetimeState, Genome, Creature, HistoryBuffer, Direction,
+    LifetimeState, Genome, Creature, HistoryBuffer,
 )
 from app.gene_logic import score_gene_match, score_history_context
 import app.config as config
@@ -18,10 +18,10 @@ from app.config import GENE_MATCH_SCORE, GENE_WILDCARD_SCORE, GENE_MISMATCH_SCOR
 def make_sensor(**kwargs) -> SensorField:
     defaults = dict(
         current_cell=CellType.EMPTY,
-        front_cell=CellType.EMPTY,
-        left_cell=CellType.EMPTY,
-        right_cell=CellType.EMPTY,
-        back_cell=CellType.EMPTY,
+        north_cell=CellType.EMPTY,
+        east_cell=CellType.EMPTY,
+        south_cell=CellType.EMPTY,
+        west_cell=CellType.EMPTY,
         last_action=ActionType.IDLE,
         last_action_success=True,
         hunger_bucket=0,
@@ -33,10 +33,10 @@ def make_sensor(**kwargs) -> SensorField:
 def make_pattern(**kwargs) -> GenePattern:
     defaults = dict(
         current_cell=None,
-        front_cell=None,
-        left_cell=None,
-        right_cell=None,
-        back_cell=None,
+        north_cell=None,
+        east_cell=None,
+        south_cell=None,
+        west_cell=None,
         last_action=None,
         last_action_success=None,
         hunger_bucket=None,
@@ -55,42 +55,42 @@ class TestGeneMatch(unittest.TestCase):
         self.assertEqual(score, 0.0)
 
     def test_exact_match_adds_positive(self):
-        sensor = make_sensor(front_cell=CellType.WALL)
-        pattern = make_pattern(front_cell=CellType.WALL)
+        sensor = make_sensor(north_cell=CellType.WALL)
+        pattern = make_pattern(north_cell=CellType.WALL)
         score = score_gene_match(sensor, pattern)
-        # Only front_cell contributes: one match
+        # Only north_cell contributes: one match
         self.assertEqual(score, GENE_MATCH_SCORE)
 
     def test_mismatch_adds_negative(self):
-        sensor = make_sensor(front_cell=CellType.EMPTY)
-        pattern = make_pattern(front_cell=CellType.WALL)
+        sensor = make_sensor(north_cell=CellType.EMPTY)
+        pattern = make_pattern(north_cell=CellType.WALL)
         score = score_gene_match(sensor, pattern)
         self.assertEqual(score, GENE_MISMATCH_SCORE)
 
     def test_wildcard_does_not_penalise(self):
-        sensor = make_sensor(front_cell=CellType.FOOD)
-        pattern = make_pattern(front_cell=None)  # wildcard
+        sensor = make_sensor(north_cell=CellType.FOOD)
+        pattern = make_pattern(north_cell=None)  # wildcard
         score = score_gene_match(sensor, pattern)
         self.assertEqual(score, GENE_WILDCARD_SCORE)
 
     def test_all_fields_exact_match(self):
         sensor = make_sensor(
             current_cell=CellType.EMPTY,
-            front_cell=CellType.FOOD,
-            left_cell=CellType.WALL,
-            right_cell=CellType.EMPTY,
-            back_cell=CellType.EMPTY,
-            last_action=ActionType.MOVE_FORWARD,
+            north_cell=CellType.FOOD,
+            east_cell=CellType.WALL,
+            south_cell=CellType.EMPTY,
+            west_cell=CellType.EMPTY,
+            last_action=ActionType.MOVE_NORTH,
             last_action_success=False,
             hunger_bucket=2,
         )
         pattern = make_pattern(
             current_cell=CellType.EMPTY,
-            front_cell=CellType.FOOD,
-            left_cell=CellType.WALL,
-            right_cell=CellType.EMPTY,
-            back_cell=CellType.EMPTY,
-            last_action=ActionType.MOVE_FORWARD,
+            north_cell=CellType.FOOD,
+            east_cell=CellType.WALL,
+            south_cell=CellType.EMPTY,
+            west_cell=CellType.EMPTY,
+            last_action=ActionType.MOVE_NORTH,
             last_action_success=False,
             hunger_bucket=2,
         )
@@ -98,13 +98,13 @@ class TestGeneMatch(unittest.TestCase):
         self.assertEqual(score, GENE_MATCH_SCORE * 8)
 
     def test_mixed_fields(self):
-        sensor = make_sensor(front_cell=CellType.FOOD, hunger_bucket=1)
+        sensor = make_sensor(north_cell=CellType.FOOD, hunger_bucket=1)
         pattern = make_pattern(
-            front_cell=CellType.FOOD,    # match
+            north_cell=CellType.FOOD,    # match
             hunger_bucket=3,             # mismatch
         )
         score = score_gene_match(sensor, pattern)
-        # front_cell match + hunger mismatch + 6 wildcards
+        # north_cell match + hunger mismatch + 6 wildcards
         expected = GENE_MATCH_SCORE + GENE_MISMATCH_SCORE + 6 * GENE_WILDCARD_SCORE
         self.assertAlmostEqual(score, expected)
 
@@ -136,10 +136,10 @@ class TestGeneMatch(unittest.TestCase):
         previous_flag = config.USE_SENSOR_HISTORY_CONTEXT
         config.USE_SENSOR_HISTORY_CONTEXT = False
         try:
-            lt = LifetimeState(x=1, y=1, direction=Direction.NORTH, energy=10.0, history_buffer=HistoryBuffer(3))
-            lt.history_buffer.push(make_sensor(front_cell=CellType.FOOD), ActionType.MOVE_FORWARD, True)
+            lt = LifetimeState(x=1, y=1, energy=10.0, history_buffer=HistoryBuffer(3))
+            lt.history_buffer.push(make_sensor(north_cell=CellType.FOOD), ActionType.MOVE_NORTH, True)
             creature = Creature(creature_id=0, genome=Genome(), lifetime=lt)
-            self.assertEqual(score_history_context(creature, make_pattern(front_cell=CellType.FOOD)), 0.0)
+            self.assertEqual(score_history_context(creature, make_pattern(north_cell=CellType.FOOD)), 0.0)
         finally:
             config.USE_SENSOR_HISTORY_CONTEXT = previous_flag
 
@@ -149,17 +149,17 @@ class TestGeneMatch(unittest.TestCase):
         config.USE_SENSOR_HISTORY_CONTEXT = True
         config.HISTORY_CONTEXT_DECAY = 1.0
         try:
-            lt = LifetimeState(x=1, y=1, direction=Direction.NORTH, energy=10.0, history_buffer=HistoryBuffer(3))
+            lt = LifetimeState(x=1, y=1, energy=10.0, history_buffer=HistoryBuffer(3))
             lt.history_buffer.push(
-                make_sensor(front_cell=CellType.FOOD, hunger_bucket=2),
-                ActionType.MOVE_FORWARD,
+                make_sensor(north_cell=CellType.FOOD, hunger_bucket=2),
+                ActionType.MOVE_NORTH,
                 True,
             )
             creature = Creature(creature_id=0, genome=Genome(), lifetime=lt)
             pattern = make_pattern(
-                front_cell=CellType.FOOD,
+                north_cell=CellType.FOOD,
                 hunger_bucket=2,
-                last_action=ActionType.MOVE_FORWARD,
+                last_action=ActionType.MOVE_NORTH,
                 last_action_success=True,
             )
             score = score_history_context(creature, pattern)

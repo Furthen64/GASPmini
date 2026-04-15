@@ -12,15 +12,14 @@ from app.gene_logic import choose_gene, score_gene
 from app.learning import apply_reward_to_history, record_history
 from app.logging_utils import debug_log, log
 from app.world import get_cell_type, creature_at, is_walkable
-from app.sensors import _DIRECTION_DELTA
 
 
-# ── Direction helpers (re-used from sensors) ──────────────────────────────────
-
-def _front_position(creature: Creature) -> tuple[int, int]:
-    lt = creature.lifetime
-    dx, dy = _DIRECTION_DELTA[lt.direction]
-    return lt.x + dx, lt.y + dy
+_ACTION_DELTAS: dict[ActionType, tuple[int, int]] = {
+    ActionType.MOVE_NORTH: (0, -1),
+    ActionType.MOVE_EAST: (1, 0),
+    ActionType.MOVE_SOUTH: (0, 1),
+    ActionType.MOVE_WEST: (-1, 0),
+}
 
 
 def _consume_food_at(creature: Creature, world: WorldState, x: int, y: int) -> bool:
@@ -55,18 +54,9 @@ def execute_action(
     """Apply `action` to `creature` and update world state. Return result."""
     lt = creature.lifetime
 
-    if action == ActionType.TURN_LEFT:
-        from app.sensors import _turn_left
-        lt.direction = _turn_left(lt.direction)
-        return ActionResult(success=True, reward=0.0, base_reward=0.0, notes="turned left")
-
-    elif action == ActionType.TURN_RIGHT:
-        from app.sensors import _turn_right
-        lt.direction = _turn_right(lt.direction)
-        return ActionResult(success=True, reward=0.0, base_reward=0.0, notes="turned right")
-
-    elif action == ActionType.MOVE_FORWARD:
-        fx, fy = _front_position(creature)
+    if action in _ACTION_DELTAS:
+        dx, dy = _ACTION_DELTAS[action]
+        fx, fy = lt.x + dx, lt.y + dy
         if not is_walkable(world, fx, fy):
             lt.failed_actions += 1
             return ActionResult(
@@ -93,7 +83,7 @@ def execute_action(
             )
         return ActionResult(success=True, reward=0.0, base_reward=0.0, notes=f"moved to ({fx},{fy})")
 
-    elif action == ActionType.IDLE:
+    if action == ActionType.IDLE:
         return ActionResult(
             success=True,
             reward=config.REWARD_IDLE,
@@ -105,7 +95,7 @@ def execute_action(
 
 
 def _counts_as_stationary_tick(action: ActionType) -> bool:
-    return action in {ActionType.TURN_LEFT, ActionType.TURN_RIGHT, ActionType.IDLE}
+    return action == ActionType.IDLE
 
 
 # ── Single creature tick ──────────────────────────────────────────────────────
