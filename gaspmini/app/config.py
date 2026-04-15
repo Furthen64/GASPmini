@@ -43,6 +43,9 @@ class SimulationProfile:
 	param_mutation_rate: float
 	param_mutation_delta: float
 	learned_priority_imprint_factor: float
+	use_sensor_history_context: bool
+	sensor_history_context_length: int
+	history_context_decay: float
 	debug_sensors: bool = False
 	debug_gene_scoring: bool = False
 	debug_actions: bool = False
@@ -88,6 +91,9 @@ PROFILE_DEFINITIONS: dict[str, SimulationProfile] = {
 		param_mutation_rate=0.18,
 		param_mutation_delta=0.05,
 		learned_priority_imprint_factor=0.15,
+		use_sensor_history_context=False,
+		sensor_history_context_length=3,
+		history_context_decay=0.7,
 	),
 	'longer_strategic': SimulationProfile(
 		label='Longer strategic',
@@ -124,6 +130,9 @@ PROFILE_DEFINITIONS: dict[str, SimulationProfile] = {
 		param_mutation_rate=0.10,
 		param_mutation_delta=0.04,
 		learned_priority_imprint_factor=0.12,
+		use_sensor_history_context=False,
+		sensor_history_context_length=3,
+		history_context_decay=0.7,
 	),
 	'fast_evo_less_starvation': SimulationProfile(
 		label='Faster evo signal less starvation',
@@ -160,6 +169,9 @@ PROFILE_DEFINITIONS: dict[str, SimulationProfile] = {
 		param_mutation_rate=0.12,
 		param_mutation_delta=0.05,
 		learned_priority_imprint_factor=0.15,
+		use_sensor_history_context=False,
+		sensor_history_context_length=3,
+		history_context_decay=0.7,
 	),
 }
 
@@ -219,6 +231,9 @@ def apply_profile(profile_id: str) -> SimulationProfile:
 		'PARAM_MUTATION_RATE': values['param_mutation_rate'],
 		'PARAM_MUTATION_DELTA': values['param_mutation_delta'],
 		'LEARNED_PRIORITY_IMPRINT_FACTOR': values['learned_priority_imprint_factor'],
+		'USE_SENSOR_HISTORY_CONTEXT': values['use_sensor_history_context'],
+		'SENSOR_HISTORY_CONTEXT_LENGTH': values['sensor_history_context_length'],
+		'HISTORY_CONTEXT_DECAY': values['history_context_decay'],
 		'DEBUG_SENSORS': values['debug_sensors'],
 		'DEBUG_GENE_SCORING': values['debug_gene_scoring'],
 		'DEBUG_ACTIONS': values['debug_actions'],

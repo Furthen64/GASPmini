@@ -6,8 +6,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 import unittest
 
-from app.models import CellType, ActionType, SensorField, GenePattern
-from app.gene_logic import score_gene_match
+from app.models import (
+    CellType, ActionType, SensorField, GenePattern,
+    LifetimeState, Genome, Creature, HistoryBuffer, Direction,
+)
+from app.gene_logic import score_gene_match, score_history_context
+import app.config as config
 from app.config import GENE_MATCH_SCORE, GENE_WILDCARD_SCORE, GENE_MISMATCH_SCORE
 
 
@@ -127,6 +131,42 @@ class TestGeneMatch(unittest.TestCase):
         pattern = make_pattern(last_action_success=True)
         score = score_gene_match(sensor, pattern)
         self.assertEqual(score, GENE_MISMATCH_SCORE)
+
+    def test_history_context_disabled_returns_zero(self):
+        previous_flag = config.USE_SENSOR_HISTORY_CONTEXT
+        config.USE_SENSOR_HISTORY_CONTEXT = False
+        try:
+            lt = LifetimeState(x=1, y=1, direction=Direction.NORTH, energy=10.0, history_buffer=HistoryBuffer(3))
+            lt.history_buffer.push(make_sensor(front_cell=CellType.FOOD), ActionType.MOVE_FORWARD, True)
+            creature = Creature(creature_id=0, genome=Genome(), lifetime=lt)
+            self.assertEqual(score_history_context(creature, make_pattern(front_cell=CellType.FOOD)), 0.0)
+        finally:
+            config.USE_SENSOR_HISTORY_CONTEXT = previous_flag
+
+    def test_history_context_enabled_rewards_recent_food_and_action(self):
+        old_use = config.USE_SENSOR_HISTORY_CONTEXT
+        old_decay = config.HISTORY_CONTEXT_DECAY
+        config.USE_SENSOR_HISTORY_CONTEXT = True
+        config.HISTORY_CONTEXT_DECAY = 1.0
+        try:
+            lt = LifetimeState(x=1, y=1, direction=Direction.NORTH, energy=10.0, history_buffer=HistoryBuffer(3))
+            lt.history_buffer.push(
+                make_sensor(front_cell=CellType.FOOD, hunger_bucket=2),
+                ActionType.MOVE_FORWARD,
+                True,
+            )
+            creature = Creature(creature_id=0, genome=Genome(), lifetime=lt)
+            pattern = make_pattern(
+                front_cell=CellType.FOOD,
+                hunger_bucket=2,
+                last_action=ActionType.MOVE_FORWARD,
+                last_action_success=True,
+            )
+            score = score_history_context(creature, pattern)
+            self.assertGreater(score, 0.0)
+        finally:
+            config.USE_SENSOR_HISTORY_CONTEXT = old_use
+            config.HISTORY_CONTEXT_DECAY = old_decay
 
 
 if __name__ == '__main__':

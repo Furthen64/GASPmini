@@ -11,7 +11,7 @@ import app.config as config
 from app.custom_maps import get_custom_map
 from app.models import (
     CellType, Direction, ActionType,
-    Gene, GenePattern, Genome, LifetimeState, Creature, WorldState, RunHistorySample,
+    Gene, GenePattern, Genome, LifetimeState, Creature, WorldState, RunHistorySample, HistoryBuffer,
 )
 
 
@@ -203,6 +203,7 @@ def spawn_creatures(
             y=y,
             direction=rng.choice(list(Direction)),
             energy=float(config.INITIAL_ENERGY),
+            history_buffer=HistoryBuffer(config.SENSOR_HISTORY_CONTEXT_LENGTH),
         )
         lifetime.run_history.append(
             RunHistorySample(
