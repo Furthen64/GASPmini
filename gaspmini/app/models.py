@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import dataclasses
 from dataclasses import dataclass, field
+from collections import deque
 from enum import Enum, auto
 from typing import Optional
 
@@ -81,6 +82,83 @@ class Genome:
     history_length: int = 6
 
 
+# ── Sensor-context history ───────────────────────────────────────────────────
+
+_ACTION_CODE: dict[Optional[ActionType], int] = {
+    None: 0,
+    ActionType.MOVE_FORWARD: 1,
+    ActionType.TURN_LEFT: 2,
+    ActionType.TURN_RIGHT: 3,
+    ActionType.IDLE: 4,
+}
+
+
+def action_to_code(action: Optional[ActionType]) -> int:
+    """Encode an action into a compact integer feature."""
+    return _ACTION_CODE[action]
+
+
+@dataclass(frozen=True)
+class HistoryTuple:
+    food_ahead: int
+    food_left: int
+    food_right: int
+    front_blocked: int
+    hunger_bucket: int
+    previous_action_code: int
+    previous_success_flag: int
+
+
+@dataclass
+class HistoryBuffer:
+    """Fixed-size FIFO for compact per-tick context tuples."""
+    length: int = 3
+    _entries: deque[HistoryTuple] = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        bounded_length = max(2, min(4, self.length))
+        self.length = bounded_length
+        self._entries = deque(maxlen=bounded_length)
+
+    @staticmethod
+    def _is_food(cell: CellType) -> int:
+        return 1 if cell == CellType.FOOD else 0
+
+    @staticmethod
+    def _is_blocked(cell: CellType) -> int:
+        return 1 if cell in {CellType.WALL, CellType.CREATURE} else 0
+
+    def push(self, sensor: SensorField, action: ActionType, success: bool) -> None:
+        """Append a compact context tuple for the tick."""
+        self._entries.append(HistoryTuple(
+            food_ahead=self._is_food(sensor.front_cell),
+            food_left=self._is_food(sensor.left_cell),
+            food_right=self._is_food(sensor.right_cell),
+            front_blocked=self._is_blocked(sensor.front_cell),
+            hunger_bucket=sensor.hunger_bucket,
+            previous_action_code=action_to_code(action),
+            previous_success_flag=1 if success else 0,
+        ))
+
+    def recent_first(self) -> list[HistoryTuple]:
+        return list(reversed(self._entries))
+
+    def flattened(self) -> list[int]:
+        """
+        Flatten tuples newest-first to a fixed-size vector.
+        Missing (older) slots are zero-padded.
+        """
+        out: list[int] = []
+        recent = self.recent_first()
+        for idx in range(self.length):
+            if idx < len(recent):
+                item = recent[idx]
+                out.extend(dataclasses.astuple(item))
+            else:
+                out.extend((0, 0, 0, 0, 0, 0, 0))
+        return out
+
+
 # ── History ───────────────────────────────────────────────────────────────────
 
 @dataclass
@@ -122,6 +200,7 @@ class LifetimeState:
     learned_gene_adjustments: dict[int, float] = field(default_factory=dict)
     history: list[HistoryEntry] = field(default_factory=list)
     run_history: list[RunHistorySample] = field(default_factory=list)
+    history_buffer: HistoryBuffer = field(default_factory=HistoryBuffer)
 
 
 # ── Creature ──────────────────────────────────────────────────────────────────
