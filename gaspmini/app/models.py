@@ -171,6 +171,39 @@ class HistoryEntry:
     tick_index: int
 
 
+@dataclass(frozen=True)
+class TransitionTuple:
+    """
+    Compact transition used for reward-event trajectory credit assignment.
+    """
+    state_features: tuple[int, ...]
+    action: ActionType
+    reward: float
+    gene_id: int
+    tick_index: int
+
+
+@dataclass
+class TransitionRingBuffer:
+    """Fixed-size FIFO ring buffer for transition tuples."""
+    length: int = 6
+    _entries: deque[TransitionTuple] = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        bounded_length = max(1, self.length)
+        self.length = bounded_length
+        self._entries = deque(maxlen=bounded_length)
+
+    def push(self, transition: TransitionTuple) -> None:
+        self._entries.append(transition)
+
+    def recent_first(self, max_steps_back: int | None = None) -> list[TransitionTuple]:
+        recent = list(reversed(self._entries))
+        if max_steps_back is None:
+            return recent
+        return recent[:max(0, max_steps_back)]
+
+
 @dataclass
 class RunHistorySample:
     age_ticks: int
@@ -201,6 +234,7 @@ class LifetimeState:
     history: list[HistoryEntry] = field(default_factory=list)
     run_history: list[RunHistorySample] = field(default_factory=list)
     history_buffer: HistoryBuffer = field(default_factory=HistoryBuffer)
+    transition_buffer: TransitionRingBuffer = field(default_factory=TransitionRingBuffer)
 
 
 # ── Creature ──────────────────────────────────────────────────────────────────

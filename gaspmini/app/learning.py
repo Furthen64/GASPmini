@@ -5,20 +5,51 @@
 from __future__ import annotations
 
 import app.config as config
-from app.models import Creature, HistoryEntry
+from app.models import Creature, HistoryEntry, SensorField, TransitionTuple
 from app.logging_utils import debug_log
+
+
+def _sensor_to_state_features(sensor: SensorField) -> tuple[int, ...]:
+    """
+    Convert sensor fields into compact numeric features for reward telemetry.
+    """
+    last_action_code = 0 if sensor.last_action is None else sensor.last_action.value
+    return (
+        sensor.current_cell.value,
+        sensor.front_cell.value,
+        sensor.left_cell.value,
+        sensor.right_cell.value,
+        sensor.back_cell.value,
+        last_action_code,
+        1 if sensor.last_action_success else 0,
+        sensor.hunger_bucket,
+    )
 
 
 def record_history(
     creature: Creature,
     entry: HistoryEntry,
 ) -> None:
-    """Append a history entry and trim to max length."""
+    """Append history and transition ring-buffer entries; trim to max length."""
     lt = creature.lifetime
     max_len = creature.genome.history_length or config.HISTORY_LENGTH
     lt.history.append(entry)
     if len(lt.history) > max_len:
         lt.history = lt.history[-max_len:]
+
+    # Keep transition ring buffer size aligned with learning horizon.
+    if lt.transition_buffer.length != max_len:
+        lt.transition_buffer.length = max_len
+        lt.transition_buffer.__post_init__()
+    lt.transition_buffer.push(
+        TransitionTuple(
+            state_features=_sensor_to_state_features(entry.sensor),
+            action=entry.action,
+            reward=entry.reward,
+            gene_id=entry.gene_id,
+            tick_index=entry.tick_index,
+        )
+    )
 
 
 def apply_reward_to_history(
@@ -27,39 +58,44 @@ def apply_reward_to_history(
     max_steps_back: int | None = None,
 ) -> None:
     """
-    Propagate `reward` backward through the creature's recent history.
+    Reward-event learning using n-step returns over the transition ring buffer.
 
-    For step i steps back from the most recent entry:
-        adjustment += reward * (reward_decay ** i) * learning_rate
+    Given recent transitions (newest-first) t0, t1, ...
+    running_return starts from the reward event and folds trajectory rewards:
 
-    This updates `lifetime.learned_gene_adjustments` in place.
+        G_0 = r(t0) + reward_event
+        G_k = r(tk) + gamma * G_{k-1}     for k > 0
+
+    Then each responsible <state, action>/gene receives:
+
+        adjustment += learning_rate * G_k
     """
     genome = creature.genome
     lt = creature.lifetime
 
     lr = genome.learning_rate
-    decay = genome.reward_decay
-    history = lt.history
+    gamma = genome.reward_decay
+    transitions = lt.transition_buffer.recent_first(max_steps_back)
 
-    if not history:
+    if not transitions:
         return
 
-    if max_steps_back is None:
-        max_steps_back = len(history)
-    else:
-        max_steps_back = min(max_steps_back, len(history))
+    running_return = reward
 
-    recent = history[-max_steps_back:]
-
-    for steps_back, entry in enumerate(reversed(recent)):
-        adjustment = reward * (decay ** steps_back) * lr
-        gene_id = entry.gene_id
+    for steps_back, transition in enumerate(transitions):
+        running_return = transition.reward + running_return
+        adjustment = lr * running_return
+        gene_id = transition.gene_id
         current = lt.learned_gene_adjustments.get(gene_id, 0.0)
         lt.learned_gene_adjustments[gene_id] = current + adjustment
 
         if config.DEBUG_REWARDS:
             debug_log(
-                f"  Learning: gene={gene_id}  steps_back={steps_back}  "
-                f"reward={reward:.2f}  decay^n={decay**steps_back:.3f}  "
-                f"adj+={adjustment:.4f}  total={lt.learned_gene_adjustments[gene_id]:.4f}"
+                "  CreditTrace: "
+                f"tick={transition.tick_index}  gene={gene_id}  action={transition.action.name}  "
+                f"steps_back={steps_back}  state={transition.state_features}  "
+                f"transition_r={transition.reward:.2f}  event_r={reward:.2f}  "
+                f"return={running_return:.4f}  adj+={adjustment:.4f}  "
+                f"total={lt.learned_gene_adjustments[gene_id]:.4f}"
             )
+        running_return *= gamma
