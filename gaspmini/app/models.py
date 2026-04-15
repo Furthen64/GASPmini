@@ -233,6 +233,8 @@ class LifetimeState:
     last_action_success: bool = False
     # gene_id -> cumulative learned adjustment
     learned_gene_adjustments: dict[int, float] = field(default_factory=dict)
+    # (state_features, gene_id) -> cumulative learned adjustment
+    learned_state_gene_adjustments: dict[tuple[tuple[int, ...], int], float] = field(default_factory=dict)
     history: list[HistoryEntry] = field(default_factory=list)
     run_history: list[RunHistorySample] = field(default_factory=list)
     history_buffer: HistoryBuffer = field(default_factory=HistoryBuffer)

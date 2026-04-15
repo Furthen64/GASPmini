@@ -11,6 +11,7 @@ from app.models import (
     Gene, GenePattern, Genome, LifetimeState, Creature, SensorField, HistoryEntry,
 )
 from app.learning import apply_reward_to_history, record_history
+from app.gene_logic import state_adjustment_for_gene
 
 
 def _make_creature(
@@ -63,6 +64,19 @@ def _add_history(creature: Creature, gene_id: int, tick: int, reward: float = 0.
         tick_index=tick,
     )
     record_history(creature, entry)
+
+
+def _food_sensor() -> SensorField:
+    return SensorField(
+        current_cell=CellType.EMPTY,
+        front_cell=CellType.FOOD,
+        left_cell=CellType.EMPTY,
+        right_cell=CellType.EMPTY,
+        back_cell=CellType.EMPTY,
+        last_action=ActionType.IDLE,
+        last_action_success=True,
+        hunger_bucket=0,
+    )
 
 
 class TestLearning(unittest.TestCase):
@@ -132,6 +146,7 @@ class TestLearning(unittest.TestCase):
         _add_history(creature, gene_id=0, tick=0)
         apply_reward_to_history(creature, reward=10.0)
         self.assertNotEqual(creature.lifetime.learned_gene_adjustments, {})
+        self.assertNotEqual(creature.lifetime.learned_state_gene_adjustments, {})
 
         # Simulate new epoch: replace lifetime
         creature.lifetime = LifetimeState(
@@ -140,6 +155,7 @@ class TestLearning(unittest.TestCase):
             energy=30.0,
         )
         self.assertEqual(creature.lifetime.learned_gene_adjustments, {})
+        self.assertEqual(creature.lifetime.learned_state_gene_adjustments, {})
 
     def test_history_trimmed_to_max_length(self):
         creature = _make_creature(history_length=3)
@@ -168,6 +184,23 @@ class TestLearning(unittest.TestCase):
         self.assertAlmostEqual(creature.lifetime.learned_gene_adjustments.get(2, 0.0), 4.0)
         self.assertAlmostEqual(creature.lifetime.learned_gene_adjustments.get(1, 0.0), 4.0)
         self.assertAlmostEqual(creature.lifetime.learned_gene_adjustments.get(0, 0.0), 3.0)
+
+    def test_state_specific_adjustment_only_applies_in_matching_state(self):
+        creature = _make_creature(learning_rate=1.0, reward_decay=1.0)
+        entry = HistoryEntry(
+            sensor=_food_sensor(),
+            gene_id=2,
+            action=ActionType.IDLE,
+            reward=0.0,
+            action_success=True,
+            tick_index=0,
+        )
+        record_history(creature, entry)
+
+        apply_reward_to_history(creature, reward=5.0)
+
+        self.assertAlmostEqual(state_adjustment_for_gene(creature, _food_sensor(), 2), 5.0)
+        self.assertEqual(state_adjustment_for_gene(creature, _dummy_sensor(), 2), 0.0)
 
 
 if __name__ == '__main__':

@@ -75,8 +75,11 @@ def apply_reward_to_history(
         running_return = transition.reward + running_return
         adjustment = lr * running_return
         gene_id = transition.gene_id
+        state_gene_key = (transition.state_features, gene_id)
         current = lt.learned_gene_adjustments.get(gene_id, 0.0)
         lt.learned_gene_adjustments[gene_id] = current + adjustment
+        state_current = lt.learned_state_gene_adjustments.get(state_gene_key, 0.0)
+        lt.learned_state_gene_adjustments[state_gene_key] = state_current + adjustment
 
         if config.DEBUG_REWARDS:
             debug_log(
@@ -85,6 +88,7 @@ def apply_reward_to_history(
                 f"steps_back={steps_back}  state={transition.state_features}  "
                 f"transition_r={transition.reward:.2f}  event_r={reward:.2f}  "
                 f"return={running_return:.4f}  adj+={adjustment:.4f}  "
-                f"total={lt.learned_gene_adjustments[gene_id]:.4f}"
+                f"gene_total={lt.learned_gene_adjustments[gene_id]:.4f}  "
+                f"state_total={lt.learned_state_gene_adjustments[state_gene_key]:.4f}"
             )
         running_return *= gamma

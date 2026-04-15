@@ -8,6 +8,7 @@ import random
 import app.config as config
 from app.models import Gene, Genome, GenePattern, SensorField, Creature, HistoryTuple, action_to_code
 from app.feature_encoding import encode_pattern_for_matching, encode_sensor_for_matching
+from app.feature_encoding import encode_sensor_for_learning
 from app.logging_utils import debug_log
 
 
@@ -68,6 +69,11 @@ def score_history_context(creature: Creature, gene_pattern: GenePattern) -> floa
     return total
 
 
+def state_adjustment_for_gene(creature: Creature, sensor: SensorField, gene_id: int) -> float:
+    state_features = encode_sensor_for_learning(sensor)
+    return creature.lifetime.learned_state_gene_adjustments.get((state_features, gene_id), 0.0)
+
+
 # ── Gene selection ────────────────────────────────────────────────────────────
 
 def score_gene(
@@ -79,7 +85,7 @@ def score_gene(
     """Total score for a gene: match score + base priority + learned adjustment."""
     match_score = score_gene_match(sensor, gene.pattern)
     history_score = score_history_context(creature, gene.pattern)
-    adjustment = learned_adjustments.get(gene.gene_id, 0.0)
+    adjustment = state_adjustment_for_gene(creature, sensor, gene.gene_id)
     return match_score + history_score + gene.base_priority + adjustment
 
 
@@ -104,7 +110,7 @@ def choose_gene(creature: Creature, sensor: SensorField) -> Gene:
                 f"match={score_gene_match(sensor, g.pattern):.2f}  "
                 f"history={score_history_context(creature, g.pattern):.2f}  "
                 f"base={g.base_priority:.2f}  "
-                f"adj={learned.get(g.gene_id, 0.0):.3f}  "
+                f"adj={state_adjustment_for_gene(creature, sensor, g.gene_id):.3f}  "
                 f"action={g.action.name}"
             )
 

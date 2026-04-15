@@ -20,7 +20,7 @@ from app.custom_maps import get_custom_map_items
 from app.models import ActionType, CellType, Creature, RunHistorySample, WorldState
 from app.simulation_runner import SimulationRunner
 from app.sensors import build_sensor_data
-from app.gene_logic import score_gene, score_gene_match
+from app.gene_logic import score_gene, score_gene_match, state_adjustment_for_gene
 from app.evolution import compute_fitness
 from app.logging_utils import set_log_callback
 from app.ui_settings import (
@@ -742,14 +742,10 @@ class MainWindow(QMainWindow):
                 "",
                 "── Top genes ──",
             ]
-            scored = sorted(
-                genome.genes,
-                key=lambda g: score_gene(g, sensor, lt.learned_gene_adjustments, c),
-                reverse=True,
-            )
+            scored = sorted(genome.genes, key=lambda g: score_gene(g, sensor, lt.learned_gene_adjustments, c), reverse=True)
             for g in scored[:5]:
                 ms  = score_gene_match(sensor, g.pattern)
-                adj = lt.learned_gene_adjustments.get(g.gene_id, 0.0)
+                adj = state_adjustment_for_gene(c, sensor, g.gene_id)
                 ts  = score_gene(g, sensor, lt.learned_gene_adjustments, c)
                 lines.append(
                     f"  Gene {g.gene_id}: {_format_action_name(g.action)}  "
