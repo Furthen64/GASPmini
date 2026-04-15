@@ -154,6 +154,8 @@ class SimulationRunner:
         while self.world.tick_index < self.ticks_per_epoch and self.alive_count() > 0:
             tick_world(self.world)
 
+        self._imprint_lifetime_learning()
+
         # Collect results and log
         results = collect_epoch_results(self.world)
         top_result = results[0] if results else None
@@ -255,6 +257,24 @@ class SimulationRunner:
         self.best_epoch_ever = self.world.epoch_index
         self.best_genome_ever = copy.deepcopy(top_creature.genome)
         self._autosave_best_genome_if_enabled()
+
+    def _imprint_lifetime_learning(self) -> None:
+        """Write a fraction of within-epoch learning back into genome priorities."""
+        if self.world is None:
+            return
+
+        factor = config.LEARNED_PRIORITY_IMPRINT_FACTOR
+        if factor == 0:
+            return
+
+        for creature in self.world.creatures:
+            learned = creature.lifetime.learned_gene_adjustments
+            if not learned:
+                continue
+            for gene in creature.genome.genes:
+                adjustment = learned.get(gene.gene_id, 0.0)
+                if adjustment != 0.0:
+                    gene.base_priority += adjustment * factor
 
     def _preserve_hall_of_fame(self, next_genomes: list[Genome]) -> list[Genome]:
         if self.best_genome_ever is None or not next_genomes:
