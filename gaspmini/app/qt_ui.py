@@ -12,7 +12,7 @@ from PySide6.QtGui import QColor, QPainter, QFont, QMouseEvent, QPen, QCloseEven
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
     QPushButton, QLabel, QTextEdit, QLineEdit, QGroupBox, QComboBox,
-    QSizePolicy, QScrollArea, QCheckBox,
+    QSizePolicy, QCheckBox, QSplitter, QTabWidget, QDialog,
 )
 
 import app.config as config
@@ -178,8 +178,8 @@ class RunHistoryGraphWidget(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._samples: list[RunHistorySample] = []
-        self.setMinimumHeight(220)
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.setMinimumHeight(180)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
     def set_samples(self, samples: list[RunHistorySample]) -> None:
         self._samples = list(samples)
@@ -291,6 +291,83 @@ class RunHistoryGraphWidget(QWidget):
         return rect.bottom() - fraction * rect.height()
 
 
+def _set_text_preserving_scroll(text_edit: QTextEdit, text: str) -> None:
+    if text_edit.toPlainText() == text:
+        return
+
+    scroll_bar = text_edit.verticalScrollBar()
+    old_value = scroll_bar.value()
+    old_maximum = scroll_bar.maximum()
+    was_at_bottom = old_value >= max(0, old_maximum - 2)
+
+    text_edit.setPlainText(text)
+
+    new_scroll_bar = text_edit.verticalScrollBar()
+    if was_at_bottom:
+        new_scroll_bar.setValue(new_scroll_bar.maximum())
+    else:
+        new_scroll_bar.setValue(min(old_value, new_scroll_bar.maximum()))
+
+
+class InspectorWindow(QDialog):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("GASPmini Inspector")
+        self.resize(560, 760)
+
+        layout = QVBoxLayout(self)
+
+        self._summary_label = QLabel("No creature selected")
+        self._summary_label.setWordWrap(True)
+        layout.addWidget(self._summary_label)
+
+        tabs = QTabWidget()
+        layout.addWidget(tabs, 1)
+
+        creature_tab = QWidget()
+        creature_layout = QVBoxLayout(creature_tab)
+        creature_splitter = QSplitter(Qt.Orientation.Vertical)
+        creature_layout.addWidget(creature_splitter)
+
+        self._creature_info = QTextEdit()
+        self._creature_info.setReadOnly(True)
+        self._creature_info.setFont(QFont("Courier", 9))
+        creature_splitter.addWidget(self._creature_info)
+
+        self._creature_history_graph = RunHistoryGraphWidget()
+        creature_splitter.addWidget(self._creature_history_graph)
+        creature_splitter.setStretchFactor(0, 3)
+        creature_splitter.setStretchFactor(1, 2)
+        creature_splitter.setSizes([420, 300])
+
+        tabs.addTab(creature_tab, "Creature")
+
+        log_tab = QWidget()
+        log_layout = QVBoxLayout(log_tab)
+        self._log_text = QTextEdit()
+        self._log_text.setReadOnly(True)
+        self._log_text.setFont(QFont("Courier", 8))
+        log_layout.addWidget(self._log_text)
+        tabs.addTab(log_tab, "Log")
+
+    def update_creature(self, summary: str, details: str, samples: list[RunHistorySample]) -> None:
+        self._summary_label.setText(summary)
+        _set_text_preserving_scroll(self._creature_info, details)
+        self._creature_history_graph.set_samples(samples)
+
+    def clear_creature(self, message: str) -> None:
+        self._summary_label.setText("No creature selected")
+        _set_text_preserving_scroll(self._creature_info, message)
+        self._creature_history_graph.set_samples([])
+
+    def append_log(self, message: str) -> None:
+        scroll_bar = self._log_text.verticalScrollBar()
+        was_at_bottom = scroll_bar.value() >= max(0, scroll_bar.maximum() - 2)
+        self._log_text.append(message)
+        if was_at_bottom:
+            scroll_bar.setValue(scroll_bar.maximum())
+
+
 # ── Main Window ────────────────────────────────────────────────────────────────
 
 class MainWindow(QMainWindow):
@@ -323,22 +400,22 @@ class MainWindow(QMainWindow):
         central = QWidget()
         self.setCentralWidget(central)
         root_layout = QHBoxLayout(central)
-        root_layout.setStretch(0, 3)
-        root_layout.setStretch(1, 1)
+
+        self._inspector = InspectorWindow(self)
+
+        self._main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        root_layout.addWidget(self._main_splitter)
 
         # ── Left: grid ────────────────────────────────────────────────────────
         self._grid_widget = GridWidget(self._sim)
-        root_layout.addWidget(self._grid_widget)
+        self._main_splitter.addWidget(self._grid_widget)
 
-        # ── Right: controls + info ─────────────────────────────────────────────
+        # ── Right: controls + compact status ──────────────────────────────────
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_scroll = QScrollArea()
-        right_scroll.setWidget(right_panel)
-        right_scroll.setWidgetResizable(True)
-        right_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        root_layout.addWidget(right_scroll)
+        self._main_splitter.addWidget(right_panel)
+        self._main_splitter.setStretchFactor(0, 4)
+        self._main_splitter.setStretchFactor(1, 1)
 
         # Simulation status
         status_group = QGroupBox("Simulation")
@@ -347,7 +424,8 @@ class MainWindow(QMainWindow):
         self._lbl_epoch = QLabel("Epoch: 0")
         self._lbl_tick  = QLabel("Tick: 0")
         self._lbl_alive = QLabel("Alive: 0")
-        for lbl in (self._lbl_mode, self._lbl_epoch, self._lbl_tick, self._lbl_alive):
+        self._lbl_selected = QLabel("Selected: none")
+        for lbl in (self._lbl_mode, self._lbl_epoch, self._lbl_tick, self._lbl_alive, self._lbl_selected):
             status_layout.addWidget(lbl)
         right_layout.addWidget(status_group)
 
@@ -355,7 +433,8 @@ class MainWindow(QMainWindow):
         history_layout = QVBoxLayout(history_group)
         self._epoch_history_text = QTextEdit()
         self._epoch_history_text.setReadOnly(True)
-        self._epoch_history_text.setFixedHeight(120)
+        self._epoch_history_text.setMinimumHeight(100)
+        self._epoch_history_text.setMaximumHeight(180)
         self._epoch_history_text.setFont(QFont("Courier", 8))
         history_layout.addWidget(self._epoch_history_text)
         right_layout.addWidget(history_group)
@@ -370,6 +449,7 @@ class MainWindow(QMainWindow):
         self._btn_step_epoch= QPushButton("Step Epoch")
         self._btn_reset     = QPushButton("Reset")
         self._btn_testing_ground = QPushButton("Enter Testing Ground")
+        self._btn_open_inspector = QPushButton("Open Inspector")
         self._btn_testing_ground.setCheckable(True)
 
         self._btn_start.clicked.connect(self._on_start)
@@ -378,9 +458,10 @@ class MainWindow(QMainWindow):
         self._btn_step_epoch.clicked.connect(self._on_step_epoch)
         self._btn_reset.clicked.connect(self._on_reset)
         self._btn_testing_ground.toggled.connect(self._on_testing_ground_toggled)
+        self._btn_open_inspector.clicked.connect(self._on_open_inspector)
 
         for btn in (self._btn_start, self._btn_pause, self._btn_step_tick,
-                self._btn_step_epoch, self._btn_reset, self._btn_testing_ground):
+            self._btn_step_epoch, self._btn_reset, self._btn_testing_ground, self._btn_open_inspector):
             ctrl_layout.addWidget(btn)
 
         # Seed control
@@ -441,30 +522,11 @@ class MainWindow(QMainWindow):
         ctrl_layout.addWidget(persistence_group)
 
         right_layout.addWidget(ctrl_group)
-
-        # Selected creature info
-        creature_group = QGroupBox("Selected Creature")
-        creature_layout = QVBoxLayout(creature_group)
-        self._creature_info = QTextEdit()
-        self._creature_info.setReadOnly(True)
-        self._creature_info.setFixedHeight(220)
-        creature_layout.addWidget(self._creature_info)
-        self._creature_history_graph = RunHistoryGraphWidget()
-        creature_layout.addWidget(self._creature_history_graph)
-        right_layout.addWidget(creature_group)
-
-        # Log output
-        log_group = QGroupBox("Log")
-        log_layout = QVBoxLayout(log_group)
-        self._log_text = QTextEdit()
-        self._log_text.setReadOnly(True)
-        self._log_text.setFont(QFont("Courier", 8))
-        log_layout.addWidget(self._log_text)
-        right_layout.addWidget(log_group)
         right_layout.addStretch(1)
 
         native_grid = self._grid_widget.sizeHint()
         self.resize(native_grid.width() + 420, max(native_grid.height(), 720))
+        self._main_splitter.setSizes([native_grid.width(), 360])
 
     # ── Refresh ────────────────────────────────────────────────────────────────
 
@@ -484,6 +546,7 @@ class MainWindow(QMainWindow):
         else:
             self._lbl_tick.setText(f"Tick: {world.tick_index} / {self._sim.ticks_per_epoch}")
         self._lbl_alive.setText(f"Alive: {self._sim.alive_count()} / {len(world.creatures)}")
+        self._lbl_selected.setText(self._selected_creature_status_text())
         self._refresh_epoch_history()
         self._refresh_creature_info()
 
@@ -522,8 +585,7 @@ class MainWindow(QMainWindow):
     def _refresh_creature_info(self) -> None:
         c = self._selected_creature
         if c is None:
-            self._creature_info.setPlainText("(no creature selected – click a cell)")
-            self._creature_history_graph.set_samples([])
+            self._inspector.clear_creature("(no creature selected – click a cell)")
             return
 
         lt = c.lifetime
@@ -582,8 +644,21 @@ class MainWindow(QMainWindow):
             for gid, adj in sorted(lt.learned_gene_adjustments.items()):
                 lines.append(f"  Gene {gid}: {adj:+.4f}")
 
-        self._creature_info.setPlainText('\n'.join(lines))
-        self._creature_history_graph.set_samples(lt.run_history)
+        detail_text = '\n'.join(lines)
+        summary = (
+            f"Creature {c.creature_id}  |  Pos ({lt.x}, {lt.y})  |  "
+            f"Energy {lt.energy:.1f}  |  Fitness {compute_fitness(c):.2f}"
+        )
+        self._inspector.update_creature(summary, detail_text, lt.run_history)
+
+    def _selected_creature_status_text(self) -> str:
+        if self._selected_creature is None:
+            return "Selected: none"
+        lt = self._selected_creature.lifetime
+        return (
+            f"Selected: #{self._selected_creature.creature_id} at ({lt.x}, {lt.y}), "
+            f"energy {lt.energy:.1f}"
+        )
 
     def _sync_selected_creature(self) -> None:
         world = self._sim.world
@@ -713,6 +788,11 @@ class MainWindow(QMainWindow):
         self._save_ui_settings()
         self._refresh()
 
+    def _on_open_inspector(self) -> None:
+        self._inspector.show()
+        self._inspector.raise_()
+        self._inspector.activateWindow()
+
     def _sync_persistence_settings_from_ui(self) -> None:
         self._sim.configure_best_genome_persistence(
             autosave_enabled=self._autosave_best_checkbox.isChecked(),
@@ -765,6 +845,21 @@ class MainWindow(QMainWindow):
             else:
                 self._btn_testing_ground.setText("Enter Testing Ground")
 
+        main_geometry = values.get('main_window_geometry')
+        if main_geometry:
+            self.restoreGeometry(main_geometry)
+
+        splitter_state = values.get('main_splitter_state')
+        if splitter_state:
+            self._main_splitter.restoreState(splitter_state)
+
+        inspector_geometry = values.get('inspector_geometry')
+        if inspector_geometry:
+            self._inspector.restoreGeometry(inspector_geometry)
+
+        if bool(values.get('inspector_visible')):
+            self._inspector.show()
+
     def _save_ui_settings(self) -> None:
         if self._applying_ui_settings:
             return
@@ -778,6 +873,10 @@ class MainWindow(QMainWindow):
             ticks_per_epoch=self._parse_ticks_per_epoch_from_ui(default=self._sim.ticks_per_epoch),
             seed=self._parse_seed_from_ui(default=self._sim.seed),
             testing_ground_enabled=self._sim.is_testing_ground(),
+            main_window_geometry=self.saveGeometry(),
+            main_splitter_state=self._main_splitter.saveState(),
+            inspector_geometry=self._inspector.saveGeometry(),
+            inspector_visible=self._inspector.isVisible(),
         )
         self._sync_persistence_settings_from_ui()
 
@@ -815,11 +914,7 @@ class MainWindow(QMainWindow):
             self._append_log(f"No saved best creature found at {self._sim.autosave_best_path}")
 
     def _append_log(self, message: str) -> None:
-        self._log_text.append(message)
-        # Auto-scroll to bottom
-        self._log_text.verticalScrollBar().setValue(
-            self._log_text.verticalScrollBar().maximum()
-        )
+        self._inspector.append_log(message)
 
     def closeEvent(self, event: QCloseEvent) -> None:
         self._save_ui_settings()

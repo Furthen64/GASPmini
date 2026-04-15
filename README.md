@@ -71,7 +71,8 @@ python -m pytest tests/ -v
 | Enter Testing Ground | Run the best known creature alone until it dies |
 
 Click any creature cell in the grid to inspect its sensor data, gene scores, learned adjustments, and history.
-The selected-creature panel also shows a per-run graph for energy, food eaten, and failed actions.
+The main window keeps the grid prominent and moves detailed inspection into a separate Inspector window.
+Open the Inspector to read the selected creature's live-updating debug view, see a larger per-run graph for energy, food eaten, and failed actions, and follow logs without squeezing them into the main dashboard.
 The controls panel also lets you autosave the best creature genome to a JSON file and inject that saved genome into a fresh reset population.
 
 ## Key design principles (v1)

@@ -12,6 +12,10 @@ PROFILE_ID_KEY = 'simulation/profile_id'
 TICKS_PER_EPOCH_KEY = 'simulation/ticks_per_epoch'
 SEED_KEY = 'simulation/seed'
 TESTING_GROUND_ENABLED_KEY = 'simulation/testing_ground_enabled'
+MAIN_WINDOW_GEOMETRY_KEY = 'ui/main_window_geometry'
+MAIN_SPLITTER_STATE_KEY = 'ui/main_splitter_state'
+INSPECTOR_GEOMETRY_KEY = 'ui/inspector_geometry'
+INSPECTOR_VISIBLE_KEY = 'ui/inspector_visible'
 
 
 def make_app_settings() -> QSettings:
@@ -53,6 +57,14 @@ def load_main_window_settings(
         'seed': _to_int(settings.value(SEED_KEY, default_seed), default_seed),
         'testing_ground_enabled': _to_bool(settings.value(TESTING_GROUND_ENABLED_KEY, False)),
     })
+    if settings.contains(MAIN_WINDOW_GEOMETRY_KEY):
+        values['main_window_geometry'] = settings.value(MAIN_WINDOW_GEOMETRY_KEY)
+    if settings.contains(MAIN_SPLITTER_STATE_KEY):
+        values['main_splitter_state'] = settings.value(MAIN_SPLITTER_STATE_KEY)
+    if settings.contains(INSPECTOR_GEOMETRY_KEY):
+        values['inspector_geometry'] = settings.value(INSPECTOR_GEOMETRY_KEY)
+    if settings.contains(INSPECTOR_VISIBLE_KEY):
+        values['inspector_visible'] = _to_bool(settings.value(INSPECTOR_VISIBLE_KEY, False))
     return values
 
 
@@ -66,6 +78,10 @@ def save_main_window_settings(
     ticks_per_epoch: int,
     seed: int,
     testing_ground_enabled: bool,
+    main_window_geometry: object = None,
+    main_splitter_state: object = None,
+    inspector_geometry: object = None,
+    inspector_visible: bool = False,
 ) -> None:
     save_best_creature_persistence_settings(
         settings,
@@ -77,6 +93,22 @@ def save_main_window_settings(
     settings.setValue(TICKS_PER_EPOCH_KEY, ticks_per_epoch)
     settings.setValue(SEED_KEY, seed)
     settings.setValue(TESTING_GROUND_ENABLED_KEY, testing_ground_enabled)
+    if main_window_geometry is None:
+        settings.remove(MAIN_WINDOW_GEOMETRY_KEY)
+    else:
+        settings.setValue(MAIN_WINDOW_GEOMETRY_KEY, main_window_geometry)
+    if main_splitter_state is None:
+        settings.remove(MAIN_SPLITTER_STATE_KEY)
+    else:
+        settings.setValue(MAIN_SPLITTER_STATE_KEY, main_splitter_state)
+    if inspector_geometry is None:
+        settings.remove(INSPECTOR_GEOMETRY_KEY)
+    else:
+        settings.setValue(INSPECTOR_GEOMETRY_KEY, inspector_geometry)
+    if inspector_visible:
+        settings.setValue(INSPECTOR_VISIBLE_KEY, inspector_visible)
+    else:
+        settings.remove(INSPECTOR_VISIBLE_KEY)
     settings.sync()
 
 
