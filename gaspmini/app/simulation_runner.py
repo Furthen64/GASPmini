@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import copy
 import random
+import statistics
 from pathlib import Path
 
 import app.config as config
@@ -159,18 +160,28 @@ class SimulationRunner:
         # Collect results and log
         results = collect_epoch_results(self.world)
         top_result = results[0] if results else None
+        prev_top = self.epoch_history[-1]['top_fitness'] if self.epoch_history else None
+        top = top_result.fitness if top_result else 0.0
+        learning_speed = 0.0 if prev_top is None else top - prev_top
+        action_value_variance = self._action_value_variance()
+
         self.epoch_history.append({
             'epoch': self.world.epoch_index,
             'results': results,
-            'top_fitness': top_result.fitness if top_result else 0.0,
+            'top_fitness': top,
             'top_creature_id': top_result.creature_id if top_result else None,
+            'sensor_encoder_mode': config.SENSOR_ENCODER_MODE,
+            'action_value_variance': action_value_variance,
+            'learning_speed': learning_speed,
         })
         alive = sum(1 for c in self.world.creatures if c.lifetime.alive)
-        top = top_result.fitness if top_result else 0.0
         log(
             f"Epoch {self.world.epoch_index} ended. "
             f"Alive: {alive}/{len(self.world.creatures)}  "
-            f"Best fitness this epoch: {top:.2f}"
+            f"Best fitness this epoch: {top:.2f}  "
+            f"encoder={config.SENSOR_ENCODER_MODE}  "
+            f"value_var={action_value_variance:.4f}  "
+            f"learning_speed={learning_speed:.4f}"
         )
 
         self._update_hall_of_fame(results)
@@ -237,6 +248,17 @@ class SimulationRunner:
         if not path:
             return False
         return genome_file_exists(path)
+
+
+    def _action_value_variance(self) -> float:
+        if self.world is None:
+            return 0.0
+        values: list[float] = []
+        for creature in self.world.creatures:
+            values.extend(creature.lifetime.learned_gene_adjustments.values())
+        if len(values) < 2:
+            return 0.0
+        return float(statistics.pvariance(values))
 
     def _update_hall_of_fame(self, results: list[CreatureEpochResult]) -> None:
         if self.world is None or not results:

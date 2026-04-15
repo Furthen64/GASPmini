@@ -7,6 +7,7 @@ import random
 
 import app.config as config
 from app.models import Gene, Genome, GenePattern, SensorField, Creature, HistoryTuple, action_to_code
+from app.feature_encoding import encode_pattern_for_matching, encode_sensor_for_matching
 from app.logging_utils import debug_log
 
 
@@ -24,16 +25,9 @@ def _score_field(pattern_value, sensor_value) -> float:
 
 def score_gene_match(sensor: SensorField, gene_pattern: GenePattern) -> float:
     """Return a match score for a gene pattern against the current sensor data."""
-    total = 0.0
-    total += _score_field(gene_pattern.current_cell,       sensor.current_cell)
-    total += _score_field(gene_pattern.front_cell,         sensor.front_cell)
-    total += _score_field(gene_pattern.left_cell,          sensor.left_cell)
-    total += _score_field(gene_pattern.right_cell,         sensor.right_cell)
-    total += _score_field(gene_pattern.back_cell,          sensor.back_cell)
-    total += _score_field(gene_pattern.last_action,        sensor.last_action)
-    total += _score_field(gene_pattern.last_action_success, sensor.last_action_success)
-    total += _score_field(gene_pattern.hunger_bucket,      sensor.hunger_bucket)
-    return total
+    sensor_features = encode_sensor_for_matching(sensor)
+    pattern_features = encode_pattern_for_matching(gene_pattern)
+    return sum(_score_field(pattern_value, sensor_value) for pattern_value, sensor_value in zip(pattern_features, sensor_features))
 
 
 def _expected_food_flag(cell_pattern) -> int | None:
