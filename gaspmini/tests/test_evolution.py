@@ -39,7 +39,13 @@ def _make_genome(n_genes: int = 5) -> Genome:
     )
 
 
-def _make_creature(cid: int, food_eaten: int = 0, age_ticks: int = 0, failed: int = 0) -> Creature:
+def _make_creature(
+    cid: int,
+    food_eaten: int = 0,
+    age_ticks: int = 0,
+    failed: int = 0,
+    stationary_ticks: int = 0,
+) -> Creature:
     lt = LifetimeState(
         x=1, y=1,
         direction=Direction.NORTH,
@@ -47,6 +53,7 @@ def _make_creature(cid: int, food_eaten: int = 0, age_ticks: int = 0, failed: in
         food_eaten=food_eaten,
         age_ticks=age_ticks,
         failed_actions=failed,
+        stationary_ticks=stationary_ticks,
         learned_gene_adjustments={0: 1.5, 1: -0.5},
     )
     return Creature(creature_id=cid, genome=_make_genome(), lifetime=lt)
@@ -75,6 +82,12 @@ class TestEvolution(unittest.TestCase):
         c0 = _make_creature(0, food_eaten=0, age_ticks=0)
         c1 = _make_creature(1, food_eaten=0, age_ticks=200)
         self.assertGreater(compute_fitness(c1), compute_fitness(c0))
+
+    def test_stationary_ticks_are_dampened_in_fitness(self):
+        active = _make_creature(0, food_eaten=0, age_ticks=100, stationary_ticks=0)
+        stationary = _make_creature(1, food_eaten=0, age_ticks=100, stationary_ticks=100)
+
+        self.assertGreater(compute_fitness(active), compute_fitness(stationary))
 
     def test_results_sorted_descending(self):
         world = _make_world_with_creatures(5)

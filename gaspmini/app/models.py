@@ -116,6 +116,7 @@ class LifetimeState:
     alive: bool = True
     age_ticks: int = 0
     failed_actions: int = 0
+    stationary_ticks: int = 0
     last_action: Optional[ActionType] = None
     last_action_success: bool = False
     # gene_id -> cumulative learned adjustment

@@ -88,6 +88,10 @@ def execute_action(
     return ActionResult(success=False, reward=0.0, notes="unknown action")
 
 
+def _counts_as_stationary_tick(action: ActionType) -> bool:
+    return action in {ActionType.TURN_LEFT, ActionType.TURN_RIGHT, ActionType.IDLE}
+
+
 # ── Single creature tick ──────────────────────────────────────────────────────
 
 def tick_creature(creature: Creature, world: WorldState) -> None:
@@ -124,6 +128,8 @@ def tick_creature(creature: Creature, world: WorldState) -> None:
     # 4. Energy drain
     lt.energy -= config.ENERGY_LOSS_PER_TICK
     lt.age_ticks += 1
+    if _counts_as_stationary_tick(action):
+        lt.stationary_ticks += 1
 
     # 5. Record history
     entry = HistoryEntry(

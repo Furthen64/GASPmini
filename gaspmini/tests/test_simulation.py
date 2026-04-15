@@ -26,13 +26,14 @@ def _make_creature(
     y: int = 2,
     direction: Direction = Direction.EAST,
     energy: float = 30.0,
+    action: ActionType = ActionType.IDLE,
 ) -> Creature:
     genome = Genome(
         genes=[
             Gene(
                 gene_id=0,
                 pattern=GenePattern(None, None, None, None, None, None, None, None),
-                action=ActionType.IDLE,
+                action=action,
                 base_priority=0.0,
             )
         ]
@@ -91,6 +92,22 @@ class TestSimulation(unittest.TestCase):
         self.assertEqual(sample.age_ticks, 1)
         self.assertEqual(sample.food_eaten, 0)
         self.assertTrue(sample.alive)
+
+    def test_turning_counts_as_stationary_tick(self):
+        creature = _make_creature(action=ActionType.TURN_LEFT)
+        world = WorldState(width=8, height=8, creatures=[creature])
+
+        tick_creature(creature, world)
+
+        self.assertEqual(creature.lifetime.stationary_ticks, 1)
+
+    def test_move_forward_does_not_count_as_stationary_tick(self):
+        creature = _make_creature(action=ActionType.MOVE_FORWARD)
+        world = WorldState(width=8, height=8, creatures=[creature])
+
+        tick_creature(creature, world)
+
+        self.assertEqual(creature.lifetime.stationary_ticks, 0)
 
 
 

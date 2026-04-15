@@ -35,6 +35,7 @@ class SimulationProfile:
 	reward_starvation_tick: float
 	fitness_food_weight: float
 	fitness_age_weight: float
+	fitness_stationary_age_factor: float
 	fitness_failed_weight: float
 	gene_match_score: float
 	gene_wildcard_score: float
@@ -79,6 +80,7 @@ PROFILE_DEFINITIONS: dict[str, SimulationProfile] = {
 		reward_starvation_tick=-0.5,
 		fitness_food_weight=3.0,
 		fitness_age_weight=0.05,
+		fitness_stationary_age_factor=0.2,
 		fitness_failed_weight=-0.2,
 		gene_match_score=2.0,
 		gene_wildcard_score=0.0,
@@ -114,6 +116,7 @@ PROFILE_DEFINITIONS: dict[str, SimulationProfile] = {
 		reward_starvation_tick=-0.5,
 		fitness_food_weight=3.0,
 		fitness_age_weight=0.06,
+		fitness_stationary_age_factor=0.2,
 		fitness_failed_weight=-0.15,
 		gene_match_score=2.0,
 		gene_wildcard_score=0.0,
@@ -149,6 +152,7 @@ PROFILE_DEFINITIONS: dict[str, SimulationProfile] = {
 		reward_starvation_tick=-0.5,
 		fitness_food_weight=3.5,
 		fitness_age_weight=0.04,
+		fitness_stationary_age_factor=0.2,
 		fitness_failed_weight=-0.15,
 		gene_match_score=2.0,
 		gene_wildcard_score=0.0,
@@ -207,6 +211,7 @@ def apply_profile(profile_id: str) -> SimulationProfile:
 		'REWARD_STARVATION_TICK': values['reward_starvation_tick'],
 		'FITNESS_FOOD_WEIGHT': values['fitness_food_weight'],
 		'FITNESS_AGE_WEIGHT': values['fitness_age_weight'],
+		'FITNESS_STATIONARY_AGE_FACTOR': values['fitness_stationary_age_factor'],
 		'FITNESS_FAILED_WEIGHT': values['fitness_failed_weight'],
 		'GENE_MATCH_SCORE': values['gene_match_score'],
 		'GENE_WILDCARD_SCORE': values['gene_wildcard_score'],
