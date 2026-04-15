@@ -45,6 +45,31 @@ def _record_run_history_sample(creature: Creature) -> None:
     )
 
 
+def _nearest_food_manhattan_distance(
+    world: WorldState,
+    x: int,
+    y: int,
+) -> int | None:
+    if not world.food_positions:
+        return None
+    return min(abs(fx - x) + abs(fy - y) for fx, fy in world.food_positions)
+
+
+def _potential_to_nearest_food(
+    world: WorldState,
+    x: int,
+    y: int,
+) -> float:
+    """
+    Potential function Phi(s) for reward shaping.
+    Uses negative Manhattan distance so moving closer increases potential.
+    """
+    nearest_food_distance = _nearest_food_manhattan_distance(world, x, y)
+    if nearest_food_distance is None:
+        return 0.0
+    return float(-nearest_food_distance)
+
+
 # ── Action execution ──────────────────────────────────────────────────────────
 
 def execute_action(
@@ -58,34 +83,50 @@ def execute_action(
     if action == ActionType.TURN_LEFT:
         from app.sensors import _turn_left
         lt.direction = _turn_left(lt.direction)
-        return ActionResult(success=True, reward=0.0, notes="turned left")
+        return ActionResult(success=True, reward=0.0, base_reward=0.0, notes="turned left")
 
     elif action == ActionType.TURN_RIGHT:
         from app.sensors import _turn_right
         lt.direction = _turn_right(lt.direction)
-        return ActionResult(success=True, reward=0.0, notes="turned right")
+        return ActionResult(success=True, reward=0.0, base_reward=0.0, notes="turned right")
 
     elif action == ActionType.MOVE_FORWARD:
         fx, fy = _front_position(creature)
         if not is_walkable(world, fx, fy):
             lt.failed_actions += 1
-            return ActionResult(success=False, reward=config.REWARD_FAILED_MOVE, notes="wall block")
+            return ActionResult(
+                success=False,
+                reward=config.REWARD_FAILED_MOVE,
+                base_reward=config.REWARD_FAILED_MOVE,
+                notes="wall block",
+            )
         if creature_at(world, fx, fy) is not None:
             lt.failed_actions += 1
-            return ActionResult(success=False, reward=config.REWARD_FAILED_MOVE, notes="creature block")
+            return ActionResult(
+                success=False,
+                reward=config.REWARD_FAILED_MOVE,
+                base_reward=config.REWARD_FAILED_MOVE,
+                notes="creature block",
+            )
         lt.x, lt.y = fx, fy
         if _consume_food_at(creature, world, fx, fy):
             return ActionResult(
                 success=True,
                 reward=config.REWARD_EAT_FOOD,
+                base_reward=config.REWARD_EAT_FOOD,
                 notes=f"moved to ({fx},{fy}) and ate food",
             )
-        return ActionResult(success=True, reward=0.0, notes=f"moved to ({fx},{fy})")
+        return ActionResult(success=True, reward=0.0, base_reward=0.0, notes=f"moved to ({fx},{fy})")
 
     elif action == ActionType.IDLE:
-        return ActionResult(success=True, reward=config.REWARD_IDLE, notes="idle")
+        return ActionResult(
+            success=True,
+            reward=config.REWARD_IDLE,
+            base_reward=config.REWARD_IDLE,
+            notes="idle",
+        )
 
-    return ActionResult(success=False, reward=0.0, notes="unknown action")
+    return ActionResult(success=False, reward=0.0, base_reward=0.0, notes="unknown action")
 
 
 def _counts_as_stationary_tick(action: ActionType) -> bool:
@@ -116,12 +157,23 @@ def tick_creature(creature: Creature, world: WorldState) -> None:
 
     # 3. Execute action
     action = gene.action
+    phi_before = _potential_to_nearest_food(world, lt.x, lt.y)
     result = execute_action(creature, action, world)
+    phi_after = _potential_to_nearest_food(world, lt.x, lt.y)
+
+    shaping_reward = config.POTENTIAL_SHAPING_COEFFICIENT * (
+        creature.genome.reward_decay * phi_after - phi_before
+    )
+    result.shaping_reward = shaping_reward
+    result.reward = result.base_reward + shaping_reward
 
     if config.DEBUG_ACTIONS:
         debug_log(
             f"Creature {creature.creature_id} action={action.name}  "
-            f"success={result.success}  reward={result.reward:.2f}  "
+            f"success={result.success}  "
+            f"base_reward={result.base_reward:.2f}  "
+            f"shape_reward={result.shaping_reward:.2f}  "
+            f"total_reward={result.reward:.2f}  "
             f"notes={result.notes}"
         )
 
@@ -139,6 +191,8 @@ def tick_creature(creature: Creature, world: WorldState) -> None:
         reward=result.reward,
         action_success=result.success,
         tick_index=world.tick_index,
+        base_reward=result.base_reward,
+        shaping_reward=result.shaping_reward,
     )
     record_history(creature, entry)
 

@@ -97,6 +97,33 @@ class TestSimulation(unittest.TestCase):
 
         self.assertEqual(creature.lifetime.stationary_ticks, 0)
 
+    def test_potential_shaping_rewards_progress_toward_food(self):
+        creature = _make_creature(action=ActionType.MOVE_FORWARD)
+        creature.genome.reward_decay = 0.7
+        world = WorldState(width=8, height=8, food_positions={(5, 2)}, creatures=[creature])
+
+        tick_creature(creature, world)
+
+        entry = creature.lifetime.history[-1]
+        self.assertEqual(entry.base_reward, 0.0)
+        self.assertGreater(entry.shaping_reward, 0.0)
+        expected_shaping = config.POTENTIAL_SHAPING_COEFFICIENT * (0.7 * -2.0 - (-3.0))
+        self.assertAlmostEqual(entry.shaping_reward, expected_shaping)
+        self.assertAlmostEqual(entry.reward, entry.base_reward + entry.shaping_reward)
+
+    def test_eat_reward_remains_primary_over_shaping(self):
+        creature = _make_creature(action=ActionType.MOVE_FORWARD)
+        creature.genome.reward_decay = 0.7
+        world = WorldState(width=8, height=8, food_positions={(3, 2), (7, 2)}, creatures=[creature])
+
+        tick_creature(creature, world)
+
+        entry = creature.lifetime.history[-1]
+        self.assertEqual(entry.base_reward, config.REWARD_EAT_FOOD)
+        self.assertLess(abs(entry.shaping_reward), config.REWARD_EAT_FOOD)
+        self.assertGreater(entry.reward, config.REWARD_EAT_FOOD * 0.9)
+        self.assertEqual(creature.lifetime.food_eaten, 1)
+
 
 
 if __name__ == '__main__':

@@ -169,6 +169,8 @@ class HistoryEntry:
     reward: float
     action_success: bool
     tick_index: int
+    base_reward: float = 0.0
+    shaping_reward: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -277,4 +279,6 @@ class CreatureEpochResult:
 class ActionResult:
     success: bool
     reward: float
+    base_reward: float = 0.0
+    shaping_reward: float = 0.0
     notes: str = ""
