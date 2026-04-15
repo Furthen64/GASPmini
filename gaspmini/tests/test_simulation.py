@@ -44,7 +44,7 @@ def _make_creature(
 
 class TestSimulation(unittest.TestCase):
 
-    def test_move_forward_onto_food_does_not_consume_it(self):
+    def test_move_forward_onto_food_consumes_it(self):
         creature = _make_creature()
         world = WorldState(width=8, height=8, food_positions={(3, 2)}, creatures=[creature])
 
@@ -52,34 +52,22 @@ class TestSimulation(unittest.TestCase):
 
         self.assertTrue(result.success)
         self.assertEqual((creature.lifetime.x, creature.lifetime.y), (3, 2))
-        self.assertIn((3, 2), world.food_positions)
-        self.assertEqual(creature.lifetime.food_eaten, 0)
-        self.assertEqual(creature.lifetime.energy, 30.0)
-        self.assertEqual(result.reward, 0.0)
-
-    def test_eat_does_not_consume_adjacent_food(self):
-        creature = _make_creature()
-        world = WorldState(width=8, height=8, food_positions={(3, 2)}, creatures=[creature])
-
-        result = execute_action(creature, ActionType.EAT, world)
-
-        self.assertFalse(result.success)
-        self.assertIn((3, 2), world.food_positions)
-        self.assertEqual(creature.lifetime.food_eaten, 0)
-        self.assertEqual(creature.lifetime.energy, 30.0)
-        self.assertEqual(result.reward, config.REWARD_FAILED_EAT)
-
-    def test_eat_consumes_food_underfoot(self):
-        creature = _make_creature()
-        world = WorldState(width=8, height=8, food_positions={(2, 2)}, creatures=[creature])
-
-        result = execute_action(creature, ActionType.EAT, world)
-
-        self.assertTrue(result.success)
-        self.assertNotIn((2, 2), world.food_positions)
+        self.assertNotIn((3, 2), world.food_positions)
         self.assertEqual(creature.lifetime.food_eaten, 1)
         self.assertEqual(creature.lifetime.energy, 30.0 + config.ENERGY_GAIN_FROM_FOOD)
         self.assertEqual(result.reward, config.REWARD_EAT_FOOD)
+
+    def test_idle_does_not_consume_food_underfoot(self):
+        creature = _make_creature()
+        world = WorldState(width=8, height=8, food_positions={(2, 2)}, creatures=[creature])
+
+        result = execute_action(creature, ActionType.IDLE, world)
+
+        self.assertTrue(result.success)
+        self.assertIn((2, 2), world.food_positions)
+        self.assertEqual(creature.lifetime.food_eaten, 0)
+        self.assertEqual(creature.lifetime.energy, 30.0)
+        self.assertEqual(result.reward, config.REWARD_IDLE)
 
     def test_tick_creature_records_run_history_sample(self):
         creature = _make_creature()

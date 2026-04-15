@@ -32,7 +32,6 @@ class ActionType(Enum):
     MOVE_FORWARD = auto()
     TURN_LEFT = auto()
     TURN_RIGHT = auto()
-    EAT = auto()
     IDLE = auto()
 
 

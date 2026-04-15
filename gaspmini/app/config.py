@@ -29,7 +29,6 @@ class SimulationProfile:
 	default_exploration_rate: float
 	reward_eat_food: float
 	reward_failed_move: float
-	reward_failed_eat: float
 	reward_idle: float
 	reward_death: float
 	reward_starvation_tick: float
@@ -74,7 +73,6 @@ PROFILE_DEFINITIONS: dict[str, SimulationProfile] = {
 		default_exploration_rate=0.08,
 		reward_eat_food=10.0,
 		reward_failed_move=-1.0,
-		reward_failed_eat=-1.0,
 		reward_idle=-0.2,
 		reward_death=-5.0,
 		reward_starvation_tick=-0.5,
@@ -110,7 +108,6 @@ PROFILE_DEFINITIONS: dict[str, SimulationProfile] = {
 		default_exploration_rate=0.03,
 		reward_eat_food=10.0,
 		reward_failed_move=-1.0,
-		reward_failed_eat=-1.0,
 		reward_idle=-0.1,
 		reward_death=-5.0,
 		reward_starvation_tick=-0.5,
@@ -146,7 +143,6 @@ PROFILE_DEFINITIONS: dict[str, SimulationProfile] = {
 		default_exploration_rate=0.05,
 		reward_eat_food=10.0,
 		reward_failed_move=-1.0,
-		reward_failed_eat=-1.0,
 		reward_idle=-0.15,
 		reward_death=-5.0,
 		reward_starvation_tick=-0.5,
@@ -205,7 +201,6 @@ def apply_profile(profile_id: str) -> SimulationProfile:
 		'DEFAULT_EXPLORATION_RATE': values['default_exploration_rate'],
 		'REWARD_EAT_FOOD': values['reward_eat_food'],
 		'REWARD_FAILED_MOVE': values['reward_failed_move'],
-		'REWARD_FAILED_EAT': values['reward_failed_eat'],
 		'REWARD_IDLE': values['reward_idle'],
 		'REWARD_DEATH': values['reward_death'],
 		'REWARD_STARVATION_TICK': values['reward_starvation_tick'],

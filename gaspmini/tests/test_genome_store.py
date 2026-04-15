@@ -15,7 +15,7 @@ def _make_genome() -> Genome:
             Gene(
                 gene_id=0,
                 pattern=GenePattern(CellType.FOOD, CellType.EMPTY, None, None, None, ActionType.MOVE_FORWARD, True, 2),
-                action=ActionType.EAT,
+                action=ActionType.IDLE,
                 base_priority=1.25,
             )
         ],

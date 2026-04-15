@@ -6,6 +6,11 @@ from pathlib import Path
 from app.models import ActionType, CellType, Gene, GenePattern, Genome
 
 
+LEGACY_ACTION_RENAMES = {
+    'EAT': 'IDLE',
+}
+
+
 def save_genome_to_file(genome: Genome, file_path: str) -> None:
     path = Path(file_path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -64,7 +69,7 @@ def _gene_from_dict(data: dict) -> Gene:
     pattern = data['pattern']
     return Gene(
         gene_id=int(data['gene_id']),
-        action=ActionType[data['action']],
+        action=_action_type(data['action']),
         base_priority=float(data['base_priority']),
         pattern=GenePattern(
             current_cell=_cell_type_or_none(pattern['current_cell']),
@@ -94,4 +99,9 @@ def _cell_type_or_none(value: str | None) -> CellType | None:
 def _action_type_or_none(value: str | None) -> ActionType | None:
     if value is None:
         return None
-    return ActionType[value]
+    return _action_type(value)
+
+
+def _action_type(value: str) -> ActionType:
+    mapped_value = LEGACY_ACTION_RENAMES.get(value, value)
+    return ActionType[mapped_value]

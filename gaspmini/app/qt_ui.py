@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 import app.config as config
-from app.models import CellType, Creature, RunHistorySample, WorldState
+from app.models import ActionType, CellType, Creature, RunHistorySample, WorldState
 from app.simulation_runner import SimulationRunner
 from app.sensors import build_sensor_data
 from app.gene_logic import score_gene, score_gene_match
@@ -47,6 +47,19 @@ GRAPH_TEXT_COLOR = QColor(220, 220, 220)
 ENERGY_LINE_COLOR = QColor(88, 180, 255)
 FOOD_LINE_COLOR = QColor(110, 220, 120)
 FAIL_LINE_COLOR = QColor(255, 170, 70)
+DARK_BLUE_FITNESS_COLOR = QColor(18, 40, 110)
+BRIGHT_CYAN_FITNESS_COLOR = QColor(0, 255, 255)
+ACTION_MODEL_TEXT = (
+    "Actions: Move Forward, Turn Left, Turn Right, Idle. "
+    "Food is consumed automatically when a creature enters a food tile."
+)
+GRID_LEGEND_TEXT = (
+    "<b>Legend</b>  "
+    "<span style='color: rgb(60,160,60);'>■</span> Food  "
+    "<span style='color: rgb(100,100,100);'>■</span> Wall  "
+    "<span style='color: rgb(60,120,220);'>■</span> Creature  "
+    "<span style='color: rgb(255,200,0);'>■</span> Selected"
+)
 
 
 # ── Grid widget ────────────────────────────────────────────────────────────────
@@ -309,6 +322,20 @@ def _set_text_preserving_scroll(text_edit: QTextEdit, text: str) -> None:
         new_scroll_bar.setValue(min(old_value, new_scroll_bar.maximum()))
 
 
+def _format_action_name(action: ActionType | None) -> str:
+    if action is None:
+        return "None"
+    return action.name.replace('_', ' ').title()
+
+
+def _interpolate_color(start: QColor, end: QColor, fraction: float) -> QColor:
+    clamped = max(0.0, min(1.0, fraction))
+    red = round(start.red() + (end.red() - start.red()) * clamped)
+    green = round(start.green() + (end.green() - start.green()) * clamped)
+    blue = round(start.blue() + (end.blue() - start.blue()) * clamped)
+    return QColor(red, green, blue)
+
+
 class InspectorWindow(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -356,7 +383,7 @@ class InspectorWindow(QDialog):
         self._creature_history_graph.set_samples(samples)
 
     def clear_creature(self, message: str) -> None:
-        self._summary_label.setText("No creature selected")
+        self._summary_label.setText(f"No creature selected. {ACTION_MODEL_TEXT}")
         _set_text_preserving_scroll(self._creature_info, message)
         self._creature_history_graph.set_samples([])
 
@@ -386,6 +413,7 @@ class MainWindow(QMainWindow):
         self._selected_creature: Optional[Creature] = None
         self._settings: QSettings = make_app_settings()
         self._applying_ui_settings = False
+        self._max_seen_fitness = 0.0
 
         # Redirect log output to the log panel
         set_log_callback(self._append_log)
@@ -406,9 +434,34 @@ class MainWindow(QMainWindow):
         self._main_splitter = QSplitter(Qt.Orientation.Horizontal)
         root_layout.addWidget(self._main_splitter)
 
-        # ── Left: grid ────────────────────────────────────────────────────────
+        # ── Left: headline + grid + legend ───────────────────────────────────
+        left_panel = QWidget()
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(8)
+
+        self._lbl_current_max_fitness_title = QLabel("Curr Max Fitness:")
+        title_font = self._lbl_current_max_fitness_title.font()
+        title_font.setPointSize(max(8, title_font.pointSize() - 1))
+        self._lbl_current_max_fitness_title.setFont(title_font)
+        left_layout.addWidget(self._lbl_current_max_fitness_title)
+
+        self._lbl_current_max_fitness_value = QLabel("0.00")
+        fitness_font = QFont("Courier", 28)
+        fitness_font.setBold(True)
+        self._lbl_current_max_fitness_value.setFont(fitness_font)
+        self._lbl_current_max_fitness_value.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        left_layout.addWidget(self._lbl_current_max_fitness_value)
+
         self._grid_widget = GridWidget(self._sim)
-        self._main_splitter.addWidget(self._grid_widget)
+        left_layout.addWidget(self._grid_widget, 1)
+
+        self._lbl_grid_legend = QLabel(GRID_LEGEND_TEXT)
+        self._lbl_grid_legend.setTextFormat(Qt.TextFormat.RichText)
+        self._lbl_grid_legend.setWordWrap(True)
+        left_layout.addWidget(self._lbl_grid_legend)
+
+        self._main_splitter.addWidget(left_panel)
 
         # ── Right: controls + compact status ──────────────────────────────────
         right_panel = QWidget()
@@ -428,6 +481,13 @@ class MainWindow(QMainWindow):
         for lbl in (self._lbl_mode, self._lbl_epoch, self._lbl_tick, self._lbl_alive, self._lbl_selected):
             status_layout.addWidget(lbl)
         right_layout.addWidget(status_group)
+
+        action_group = QGroupBox("Action Model")
+        action_layout = QVBoxLayout(action_group)
+        self._lbl_action_model = QLabel(ACTION_MODEL_TEXT)
+        self._lbl_action_model.setWordWrap(True)
+        action_layout.addWidget(self._lbl_action_model)
+        right_layout.addWidget(action_group)
 
         history_group = QGroupBox("Epoch Bests")
         history_layout = QVBoxLayout(history_group)
@@ -547,11 +607,45 @@ class MainWindow(QMainWindow):
             self._lbl_tick.setText(f"Tick: {world.tick_index} / {self._sim.ticks_per_epoch}")
         self._lbl_alive.setText(f"Alive: {self._sim.alive_count()} / {len(world.creatures)}")
         self._lbl_selected.setText(self._selected_creature_status_text())
+        self._refresh_current_max_fitness_label()
         self._refresh_epoch_history()
         self._refresh_creature_info()
 
         self._grid_widget._update_size()
         self._grid_widget.update()
+
+    def _refresh_current_max_fitness_label(self) -> None:
+        best_creature = self._sim.current_best_creature()
+        if best_creature is None:
+            self._lbl_current_max_fitness_value.setText("0.00")
+            self._lbl_current_max_fitness_value.setStyleSheet(
+                f"color: {DARK_BLUE_FITNESS_COLOR.name()};"
+            )
+            return
+
+        current_fitness = compute_fitness(best_creature)
+        reference_fitness = max(
+            self._max_seen_fitness,
+            current_fitness,
+            self._sim.best_fitness_ever or 0.0,
+        )
+        self._max_seen_fitness = reference_fitness
+
+        if reference_fitness <= 0:
+            color_fraction = 0.0
+        else:
+            color_fraction = max(0.0, current_fitness) / reference_fitness
+
+        fitness_color = _interpolate_color(
+            DARK_BLUE_FITNESS_COLOR,
+            BRIGHT_CYAN_FITNESS_COLOR,
+            color_fraction,
+        )
+
+        self._lbl_current_max_fitness_value.setText(f"{current_fitness:.2f}")
+        self._lbl_current_max_fitness_value.setStyleSheet(
+            f"color: {fitness_color.name()};"
+        )
 
     def _refresh_epoch_history(self) -> None:
         history = self._sim.epoch_history
@@ -601,6 +695,9 @@ class MainWindow(QMainWindow):
             f"Alive: {lt.alive}",
             f"Fitness: {compute_fitness(c):.2f}",
             "",
+            "── Action model ──",
+            ACTION_MODEL_TEXT,
+            "",
             "── Genome params ──",
             f"Genes: {len(genome.genes)}",
             f"Learning rate: {genome.learning_rate:.3f}",
@@ -619,7 +716,7 @@ class MainWindow(QMainWindow):
                 f"Right: {sensor.right_cell.name}",
                 f"Back:  {sensor.back_cell.name}",
                 f"Hunger bucket: {sensor.hunger_bucket}",
-                f"Last action: {sensor.last_action.name if sensor.last_action else 'None'}",
+                f"Last action: {_format_action_name(sensor.last_action)}",
                 f"Last success: {sensor.last_action_success}",
                 "",
                 "── Top genes ──",
@@ -634,7 +731,7 @@ class MainWindow(QMainWindow):
                 adj = lt.learned_gene_adjustments.get(g.gene_id, 0.0)
                 ts  = score_gene(g, sensor, lt.learned_gene_adjustments)
                 lines.append(
-                    f"  Gene {g.gene_id}: {g.action.name}  "
+                    f"  Gene {g.gene_id}: {_format_action_name(g.action)}  "
                     f"match={ms:.1f} base={g.base_priority:.2f} "
                     f"adj={adj:.3f} → {ts:.2f}"
                 )

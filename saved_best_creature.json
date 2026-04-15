@@ -1,139 +1,139 @@
 {
-  "learning_rate": 0.2299660608268531,
-  "reward_decay": 0.825368821500323,
-  "exploration_rate": 0.018467290417116998,
+  "learning_rate": 0.23841535210326115,
+  "reward_decay": 0.8427540709221093,
+  "exploration_rate": 0.013809333150570976,
   "history_length": 8,
   "genes": [
     {
       "gene_id": 0,
       "action": "TURN_RIGHT",
-      "base_priority": 0.4220757126617247,
+      "base_priority": 0.4874700267726296,
       "pattern": {
-        "current_cell": "EMPTY",
+        "current_cell": null,
         "front_cell": null,
-        "left_cell": "EMPTY",
-        "right_cell": "WALL",
+        "left_cell": "WALL",
+        "right_cell": "FOOD",
         "back_cell": null,
-        "last_action": "TURN_LEFT",
-        "last_action_success": null,
-        "hunger_bucket": 3
+        "last_action": "MOVE_FORWARD",
+        "last_action_success": false,
+        "hunger_bucket": 1
       }
     },
     {
       "gene_id": 1,
-      "action": "TURN_RIGHT",
-      "base_priority": -0.35442181185542887,
+      "action": "MOVE_FORWARD",
+      "base_priority": 0.16657926928365474,
       "pattern": {
         "current_cell": null,
         "front_cell": null,
-        "left_cell": "EMPTY",
-        "right_cell": "FOOD",
-        "back_cell": "EMPTY",
-        "last_action": "TURN_LEFT",
-        "last_action_success": false,
-        "hunger_bucket": 3
+        "left_cell": null,
+        "right_cell": null,
+        "back_cell": null,
+        "last_action": "MOVE_FORWARD",
+        "last_action_success": null,
+        "hunger_bucket": 1
       }
     },
     {
       "gene_id": 2,
-      "action": "TURN_LEFT",
-      "base_priority": -0.09890520641648304,
+      "action": "IDLE",
+      "base_priority": 0.4304933338792061,
       "pattern": {
         "current_cell": null,
-        "front_cell": "CREATURE",
-        "left_cell": "CREATURE",
-        "right_cell": "CREATURE",
-        "back_cell": "FOOD",
-        "last_action": "MOVE_FORWARD",
+        "front_cell": "FOOD",
+        "left_cell": "FOOD",
+        "right_cell": "WALL",
+        "back_cell": null,
+        "last_action": "TURN_LEFT",
         "last_action_success": null,
         "hunger_bucket": 0
       }
     },
     {
       "gene_id": 3,
-      "action": "IDLE",
-      "base_priority": -0.4519510009829153,
+      "action": "TURN_RIGHT",
+      "base_priority": -0.3656667247962371,
       "pattern": {
-        "current_cell": "CREATURE",
+        "current_cell": null,
         "front_cell": "EMPTY",
-        "left_cell": null,
-        "right_cell": "WALL",
-        "back_cell": "CREATURE",
+        "left_cell": "WALL",
+        "right_cell": null,
+        "back_cell": "FOOD",
         "last_action": "TURN_LEFT",
         "last_action_success": null,
-        "hunger_bucket": null
+        "hunger_bucket": 0
       }
     },
     {
       "gene_id": 4,
-      "action": "MOVE_FORWARD",
-      "base_priority": 0.22692060102368522,
+      "action": "IDLE",
+      "base_priority": -0.4041258171813118,
       "pattern": {
-        "current_cell": "EMPTY",
-        "front_cell": "EMPTY",
+        "current_cell": "FOOD",
+        "front_cell": null,
         "left_cell": "WALL",
-        "right_cell": "FOOD",
-        "back_cell": "WALL",
-        "last_action": null,
+        "right_cell": "CREATURE",
+        "back_cell": "CREATURE",
+        "last_action": "IDLE",
         "last_action_success": null,
         "hunger_bucket": null
       }
     },
     {
       "gene_id": 5,
-      "action": "MOVE_FORWARD",
-      "base_priority": 0.2959147115166163,
+      "action": "TURN_LEFT",
+      "base_priority": -0.09293857018113216,
       "pattern": {
         "current_cell": null,
         "front_cell": null,
-        "left_cell": "EMPTY",
-        "right_cell": null,
+        "left_cell": "CREATURE",
+        "right_cell": "EMPTY",
         "back_cell": "FOOD",
-        "last_action": "EAT",
-        "last_action_success": null,
-        "hunger_bucket": 1
-      }
-    },
-    {
-      "gene_id": 6,
-      "action": "EAT",
-      "base_priority": -0.1746845313940093,
-      "pattern": {
-        "current_cell": null,
-        "front_cell": "CREATURE",
-        "left_cell": "FOOD",
-        "right_cell": null,
-        "back_cell": null,
-        "last_action": "EAT",
+        "last_action": "IDLE",
         "last_action_success": null,
         "hunger_bucket": null
       }
     },
     {
-      "gene_id": 7,
-      "action": "TURN_RIGHT",
-      "base_priority": 0.14043014348354266,
+      "gene_id": 6,
+      "action": "MOVE_FORWARD",
+      "base_priority": -0.23426829807413807,
       "pattern": {
-        "current_cell": null,
+        "current_cell": "CREATURE",
         "front_cell": null,
-        "left_cell": "FOOD",
-        "right_cell": "CREATURE",
-        "back_cell": null,
-        "last_action": "MOVE_FORWARD",
-        "last_action_success": null,
-        "hunger_bucket": 0
+        "left_cell": "CREATURE",
+        "right_cell": "FOOD",
+        "back_cell": "CREATURE",
+        "last_action": "TURN_LEFT",
+        "last_action_success": false,
+        "hunger_bucket": 3
+      }
+    },
+    {
+      "gene_id": 7,
+      "action": "MOVE_FORWARD",
+      "base_priority": -0.3628156353803492,
+      "pattern": {
+        "current_cell": "EMPTY",
+        "front_cell": "CREATURE",
+        "left_cell": null,
+        "right_cell": "WALL",
+        "back_cell": "CREATURE",
+        "last_action": null,
+        "last_action_success": true,
+        "hunger_bucket": null
       }
     },
     {
       "gene_id": 8,
-      "action": "IDLE",
-      "base_priority": 0.44780856212330467,
+      "action": "MOVE_FORWARD",
+      "base_priority": 0.37740247245518554,
       "pattern": {
-        "current_cell": "CREATURE",
+        "current_cell": null,
         "front_cell": "FOOD",
-        "left_cell": "CREATURE",
-        "right_cell": "WALL",
-        "back_cell": null,
+        "left_cell": null,
+        "right_cell": null,
+        "back_cell": "WALL",
         "last_action": null,
         "last_action_success": null,
         "hunger_bucket": null
@@ -141,47 +141,47 @@
     },
     {
       "gene_id": 9,
-      "action": "IDLE",
-      "base_priority": 0.19553391829261266,
+      "action": "TURN_RIGHT",
+      "base_priority": 0.4541786066704818,
       "pattern": {
         "current_cell": null,
-        "front_cell": null,
-        "left_cell": "CREATURE",
-        "right_cell": "FOOD",
+        "front_cell": "WALL",
+        "left_cell": "EMPTY",
+        "right_cell": null,
         "back_cell": "WALL",
-        "last_action": "EAT",
-        "last_action_success": false,
+        "last_action": null,
+        "last_action_success": null,
         "hunger_bucket": null
       }
     },
     {
       "gene_id": 10,
-      "action": "TURN_LEFT",
-      "base_priority": -0.020916023545155926,
+      "action": "MOVE_FORWARD",
+      "base_priority": 0.41472491862276295,
       "pattern": {
-        "current_cell": null,
-        "front_cell": "CREATURE",
-        "left_cell": "EMPTY",
+        "current_cell": "EMPTY",
+        "front_cell": null,
+        "left_cell": "FOOD",
         "right_cell": null,
         "back_cell": null,
-        "last_action": null,
-        "last_action_success": true,
-        "hunger_bucket": 1
+        "last_action": "TURN_LEFT",
+        "last_action_success": null,
+        "hunger_bucket": null
       }
     },
     {
       "gene_id": 11,
-      "action": "EAT",
-      "base_priority": 0.022500315748931743,
+      "action": "IDLE",
+      "base_priority": -0.3628026603623761,
       "pattern": {
         "current_cell": null,
         "front_cell": null,
-        "left_cell": "EMPTY",
-        "right_cell": "FOOD",
-        "back_cell": "CREATURE",
+        "left_cell": "FOOD",
+        "right_cell": "CREATURE",
+        "back_cell": "FOOD",
         "last_action": null,
-        "last_action_success": null,
-        "hunger_bucket": 2
+        "last_action_success": true,
+        "hunger_bucket": 0
       }
     }
   ]

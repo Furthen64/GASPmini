@@ -74,13 +74,13 @@ def execute_action(
             lt.failed_actions += 1
             return ActionResult(success=False, reward=config.REWARD_FAILED_MOVE, notes="creature block")
         lt.x, lt.y = fx, fy
+        if _consume_food_at(creature, world, fx, fy):
+            return ActionResult(
+                success=True,
+                reward=config.REWARD_EAT_FOOD,
+                notes=f"moved to ({fx},{fy}) and ate food",
+            )
         return ActionResult(success=True, reward=0.0, notes=f"moved to ({fx},{fy})")
-
-    elif action == ActionType.EAT:
-        if _consume_food_at(creature, world, lt.x, lt.y):
-            return ActionResult(success=True, reward=config.REWARD_EAT_FOOD, notes="ate food underfoot")
-        lt.failed_actions += 1
-        return ActionResult(success=False, reward=config.REWARD_FAILED_EAT, notes="no food underfoot")
 
     elif action == ActionType.IDLE:
         return ActionResult(success=True, reward=config.REWARD_IDLE, notes="idle")
