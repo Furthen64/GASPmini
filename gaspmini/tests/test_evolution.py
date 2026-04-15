@@ -225,6 +225,16 @@ class TestEvolution(unittest.TestCase):
         finally:
             config.apply_profile(original_profile)
 
+    def test_custom_map_selection_overrides_seeded_biome_layout(self):
+        sim = SimulationRunner(seed=3, custom_map_id='hidden_food')
+
+        sim.reset()
+
+        self.assertIsNotNone(sim.world)
+        self.assertEqual((sim.world.width, sim.world.height), (30, 20))
+        self.assertIn((4, 5), sim.world.food_positions)
+        self.assertIn((3, 3), sim.world.walls)
+
     def test_enter_testing_ground_uses_best_genome_ever(self):
         sim = SimulationRunner(seed=13)
         sim.best_genome_ever = _make_genome(9)

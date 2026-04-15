@@ -24,9 +24,11 @@ class SimulationRunner:
         seed: int | None = None,
         ticks_per_epoch: int | None = None,
         profile_id: str | None = None,
+        custom_map_id: str | None = None,
     ) -> None:
         self.profile_id = profile_id or config.ACTIVE_PROFILE_ID
         config.apply_profile(self.profile_id)
+        self.custom_map_id = custom_map_id or None
         self.seed = config.DEFAULT_SEED if seed is None else seed
         self.ticks_per_epoch = config.TICKS_PER_EPOCH if ticks_per_epoch is None else ticks_per_epoch
         self.world: WorldState | None = None
@@ -46,6 +48,9 @@ class SimulationRunner:
         config.apply_profile(profile_id)
         self.profile_id = profile_id
         self.ticks_per_epoch = config.TICKS_PER_EPOCH
+
+    def set_custom_map(self, custom_map_id: str | None) -> None:
+        self.custom_map_id = custom_map_id or None
 
     # ── Initialisation ─────────────────────────────────────────────────────────
 
@@ -70,6 +75,7 @@ class SimulationRunner:
                     seed=self.seed,
                     genomes=[copy.deepcopy(self.testing_ground_genome)],
                     population_size=1,
+                    custom_map_id=self.custom_map_id,
                 )
                 log(f"Testing Ground reset. Seed={self.seed}  Creatures={len(self.world.creatures)}")
                 return
@@ -79,6 +85,7 @@ class SimulationRunner:
             epoch_index=0,
             seed=self.seed,
             genomes=self._build_reset_genomes(),
+            custom_map_id=self.custom_map_id,
         )
         log(f"Simulation reset. Seed={self.seed}  Creatures={len(self.world.creatures)}")
 
@@ -175,6 +182,7 @@ class SimulationRunner:
             epoch_index=next_epoch,
             seed=self.seed,
             genomes=next_genomes,
+            custom_map_id=self.custom_map_id,
         )
         log(f"Epoch {next_epoch} started. Population: {len(self.world.creatures)}")
 

@@ -8,6 +8,7 @@ import random
 from typing import Optional
 
 import app.config as config
+from app.custom_maps import get_custom_map
 from app.models import (
     CellType, Direction, ActionType,
     Gene, GenePattern, Genome, LifetimeState, Creature, WorldState, RunHistorySample,
@@ -98,6 +99,15 @@ def _place_interior_walls(world: WorldState, count: int, rng: random.Random) -> 
             world.walls.add((x, y))
             placed += 1
         attempts += 1
+
+
+def _apply_custom_map(world: WorldState, map_id: str) -> None:
+    definition = get_custom_map(map_id)
+    if definition is None:
+        raise ValueError(f"Unknown custom map: {map_id}")
+
+    world.walls = set(definition.walls)
+    world.food_positions = set(definition.food_positions)
 
 
 def spawn_food(world: WorldState, food_count: int, rng: random.Random) -> None:
@@ -219,8 +229,10 @@ def generate_world(
     interior_wall_count: int | None = None,
     width: int | None = None,
     height: int | None = None,
+    custom_map_id: str | None = None,
 ) -> WorldState:
     """Create a fresh world for the given epoch."""
+    custom_map = get_custom_map(custom_map_id)
     if seed is None:
         seed = config.DEFAULT_SEED
     if population_size is None:
@@ -229,10 +241,14 @@ def generate_world(
         food_count = config.FOOD_COUNT
     if interior_wall_count is None:
         interior_wall_count = config.INTERIOR_WALL_COUNT
-    if width is None:
-        width = config.GRID_WIDTH
-    if height is None:
-        height = config.GRID_HEIGHT
+    if custom_map is not None:
+        width = custom_map.width
+        height = custom_map.height
+    else:
+        if width is None:
+            width = config.GRID_WIDTH
+        if height is None:
+            height = config.GRID_HEIGHT
 
     # Use epoch-derived seed so each epoch has a different but reproducible layout.
     rng = make_rng(seed + epoch_index * 1000)
@@ -244,9 +260,12 @@ def generate_world(
         epoch_index=epoch_index,
     )
 
-    _place_border_walls(world)
-    _place_interior_walls(world, interior_wall_count, rng)
-    spawn_food(world, food_count, rng)
+    if custom_map is not None:
+        _apply_custom_map(world, custom_map_id)
+    else:
+        _place_border_walls(world)
+        _place_interior_walls(world, interior_wall_count, rng)
+        spawn_food(world, food_count, rng)
 
     if genomes is None:
         genomes = [make_random_genome(rng) for _ in range(population_size)]

@@ -52,6 +52,7 @@ class TestUiSettings(unittest.TestCase):
                 inject_saved_best_enabled=False,
                 autosave_path='saved/genome.json',
                 profile_id='longer_strategic',
+                custom_map_id='hidden_food',
                 ticks_per_epoch=320,
                 seed=12345,
                 testing_ground_enabled=True,
@@ -61,6 +62,7 @@ class TestUiSettings(unittest.TestCase):
             values = load_main_window_settings(
                 reader,
                 default_profile_id='short_chaotic',
+                default_custom_map_id='',
                 default_ticks_per_epoch=160,
                 default_seed=42,
             )
@@ -72,6 +74,7 @@ class TestUiSettings(unittest.TestCase):
                     'inject_saved_best_enabled': False,
                     'autosave_path': 'saved/genome.json',
                     'profile_id': 'longer_strategic',
+                    'custom_map_id': 'hidden_food',
                     'ticks_per_epoch': 320,
                     'seed': 12345,
                     'testing_ground_enabled': True,

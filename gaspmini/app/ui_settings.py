@@ -9,6 +9,7 @@ AUTOSAVE_BEST_ENABLED_KEY = 'best_creature/autosave_enabled'
 INJECT_SAVED_BEST_ENABLED_KEY = 'best_creature/inject_saved_best_enabled'
 AUTOSAVE_BEST_PATH_KEY = 'best_creature/autosave_path'
 PROFILE_ID_KEY = 'simulation/profile_id'
+CUSTOM_MAP_ID_KEY = 'simulation/custom_map_id'
 TICKS_PER_EPOCH_KEY = 'simulation/ticks_per_epoch'
 SEED_KEY = 'simulation/seed'
 TESTING_GROUND_ENABLED_KEY = 'simulation/testing_ground_enabled'
@@ -47,12 +48,14 @@ def load_main_window_settings(
     settings: QSettings,
     *,
     default_profile_id: str,
+    default_custom_map_id: str,
     default_ticks_per_epoch: int,
     default_seed: int,
 ) -> dict[str, object]:
     values = load_best_creature_persistence_settings(settings)
     values.update({
         'profile_id': str(settings.value(PROFILE_ID_KEY, default_profile_id)),
+        'custom_map_id': str(settings.value(CUSTOM_MAP_ID_KEY, default_custom_map_id)),
         'ticks_per_epoch': _to_int(settings.value(TICKS_PER_EPOCH_KEY, default_ticks_per_epoch), default_ticks_per_epoch),
         'seed': _to_int(settings.value(SEED_KEY, default_seed), default_seed),
         'testing_ground_enabled': _to_bool(settings.value(TESTING_GROUND_ENABLED_KEY, False)),
@@ -75,6 +78,7 @@ def save_main_window_settings(
     inject_saved_best_enabled: bool,
     autosave_path: str,
     profile_id: str,
+    custom_map_id: str,
     ticks_per_epoch: int,
     seed: int,
     testing_ground_enabled: bool,
@@ -90,6 +94,7 @@ def save_main_window_settings(
         autosave_path=autosave_path,
     )
     settings.setValue(PROFILE_ID_KEY, profile_id)
+    settings.setValue(CUSTOM_MAP_ID_KEY, custom_map_id)
     settings.setValue(TICKS_PER_EPOCH_KEY, ticks_per_epoch)
     settings.setValue(SEED_KEY, seed)
     settings.setValue(TESTING_GROUND_ENABLED_KEY, testing_ground_enabled)

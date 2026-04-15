@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 import app.config as config
+from app.custom_maps import get_custom_map_items
 from app.models import ActionType, CellType, Creature, RunHistorySample, WorldState
 from app.simulation_runner import SimulationRunner
 from app.sensors import build_sensor_data
@@ -57,7 +58,8 @@ GRID_LEGEND_TEXT = (
     "<b>Legend</b>  "
     "<span style='color: rgb(60,160,60);'>■</span> Food  "
     "<span style='color: rgb(100,100,100);'>■</span> Wall  "
-    "<span style='color: rgb(60,120,220);'>■</span> Creature  "
+    "<span style='color: rgb(18,40,110);'>■</span> Creature low  "
+    "<span style='color: rgb(0,255,255);'>■</span> Creature high  "
     "<span style='color: rgb(255,200,0);'>■</span> Selected"
 )
 
@@ -71,6 +73,7 @@ class GridWidget(QWidget):
         super().__init__(parent)
         self._sim = sim
         self._selected_creature_id: Optional[int] = None
+        self._max_seen_fitness = 0.0
         self.setMouseTracking(True)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._update_size()
@@ -119,6 +122,20 @@ class GridWidget(QWidget):
         self._selected_creature_id = creature_id
         self.update()
 
+    def set_max_seen_fitness(self, fitness: float) -> None:
+        self._max_seen_fitness = max(0.0, fitness)
+
+    def _creature_color(self, creature: Creature) -> QColor:
+        if self._max_seen_fitness <= 0:
+            return DARK_BLUE_FITNESS_COLOR
+
+        fitness_fraction = max(0.0, compute_fitness(creature)) / self._max_seen_fitness
+        return _interpolate_color(
+            DARK_BLUE_FITNESS_COLOR,
+            BRIGHT_CYAN_FITNESS_COLOR,
+            fitness_fraction,
+        )
+
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
         world = self._sim.world
@@ -151,6 +168,8 @@ class GridWidget(QWidget):
                     c = creature_positions[pos]
                     if c.creature_id == self._selected_creature_id:
                         color = SELECTED_COLOR
+                    else:
+                        color = self._creature_color(c)
 
                 painter.fillRect(px, py, CELL_SIZE, CELL_SIZE, color)
 
@@ -503,25 +522,26 @@ class MainWindow(QMainWindow):
         ctrl_group = QGroupBox("Controls")
         ctrl_layout = QVBoxLayout(ctrl_group)
 
-        self._btn_start     = QPushButton("▶ Start")
-        self._btn_pause     = QPushButton("⏸ Pause")
+        self._btn_run       = QPushButton("▶ Start")
         self._btn_step_tick = QPushButton("Step Tick")
         self._btn_step_epoch= QPushButton("Step Epoch")
         self._btn_reset     = QPushButton("Reset")
+        self._btn_select_best = QPushButton("Select the Best")
         self._btn_testing_ground = QPushButton("Enter Testing Ground")
         self._btn_open_inspector = QPushButton("Open Inspector")
         self._btn_testing_ground.setCheckable(True)
 
-        self._btn_start.clicked.connect(self._on_start)
-        self._btn_pause.clicked.connect(self._on_pause)
+        self._btn_run.clicked.connect(self._on_toggle_running)
         self._btn_step_tick.clicked.connect(self._on_step_tick)
         self._btn_step_epoch.clicked.connect(self._on_step_epoch)
         self._btn_reset.clicked.connect(self._on_reset)
+        self._btn_select_best.clicked.connect(self._on_select_best)
         self._btn_testing_ground.toggled.connect(self._on_testing_ground_toggled)
         self._btn_open_inspector.clicked.connect(self._on_open_inspector)
 
-        for btn in (self._btn_start, self._btn_pause, self._btn_step_tick,
-            self._btn_step_epoch, self._btn_reset, self._btn_testing_ground, self._btn_open_inspector):
+        for btn in (self._btn_run, self._btn_step_tick,
+            self._btn_step_epoch, self._btn_reset, self._btn_select_best,
+            self._btn_testing_ground, self._btn_open_inspector):
             ctrl_layout.addWidget(btn)
 
         # Seed control
@@ -547,6 +567,19 @@ class MainWindow(QMainWindow):
         self._profile_combo.currentIndexChanged.connect(self._on_profile_changed)
         profile_layout.addWidget(self._profile_combo)
         ctrl_layout.addLayout(profile_layout)
+
+        custom_map_layout = QHBoxLayout()
+        custom_map_layout.addWidget(QLabel("Map:"))
+        self._custom_map_combo = QComboBox()
+        self._custom_map_combo.addItem("Seeded Random", "")
+        for map_id, label in get_custom_map_items():
+            self._custom_map_combo.addItem(label, map_id)
+        custom_map_index = self._custom_map_combo.findData(self._sim.custom_map_id or "")
+        if custom_map_index >= 0:
+            self._custom_map_combo.setCurrentIndex(custom_map_index)
+        self._custom_map_combo.currentIndexChanged.connect(self._on_custom_map_changed)
+        custom_map_layout.addWidget(self._custom_map_combo)
+        ctrl_layout.addLayout(custom_map_layout)
 
         # Ticks per epoch control
         tpe_layout = QHBoxLayout()
@@ -607,6 +640,7 @@ class MainWindow(QMainWindow):
             self._lbl_tick.setText(f"Tick: {world.tick_index} / {self._sim.ticks_per_epoch}")
         self._lbl_alive.setText(f"Alive: {self._sim.alive_count()} / {len(world.creatures)}")
         self._lbl_selected.setText(self._selected_creature_status_text())
+        self._update_run_button_label()
         self._refresh_current_max_fitness_label()
         self._refresh_epoch_history()
         self._refresh_creature_info()
@@ -618,9 +652,8 @@ class MainWindow(QMainWindow):
         best_creature = self._sim.current_best_creature()
         if best_creature is None:
             self._lbl_current_max_fitness_value.setText("0.00")
-            self._lbl_current_max_fitness_value.setStyleSheet(
-                f"color: {DARK_BLUE_FITNESS_COLOR.name()};"
-            )
+            self._lbl_current_max_fitness_value.setStyleSheet("")
+            self._grid_widget.set_max_seen_fitness(self._max_seen_fitness)
             return
 
         current_fitness = compute_fitness(best_creature)
@@ -631,21 +664,9 @@ class MainWindow(QMainWindow):
         )
         self._max_seen_fitness = reference_fitness
 
-        if reference_fitness <= 0:
-            color_fraction = 0.0
-        else:
-            color_fraction = max(0.0, current_fitness) / reference_fitness
-
-        fitness_color = _interpolate_color(
-            DARK_BLUE_FITNESS_COLOR,
-            BRIGHT_CYAN_FITNESS_COLOR,
-            color_fraction,
-        )
-
         self._lbl_current_max_fitness_value.setText(f"{current_fitness:.2f}")
-        self._lbl_current_max_fitness_value.setStyleSheet(
-            f"color: {fitness_color.name()};"
-        )
+        self._lbl_current_max_fitness_value.setStyleSheet("")
+        self._grid_widget.set_max_seen_fitness(reference_fitness)
 
     def _refresh_epoch_history(self) -> None:
         history = self._sim.epoch_history
@@ -786,14 +807,39 @@ class MainWindow(QMainWindow):
             self._grid_widget.set_selected(None)
         self._refresh_creature_info()
 
+    def _update_run_button_label(self) -> None:
+        if self._running:
+            self._btn_run.setText("⏸ Pause")
+        else:
+            self._btn_run.setText("▶ Start")
+
+    def _on_toggle_running(self) -> None:
+        if self._running:
+            self._on_pause()
+        else:
+            self._on_start()
+
     def _on_start(self) -> None:
         if not self._running:
             self._running = True
             self._timer.start(self._timer_interval_ms)
+            self._update_run_button_label()
 
     def _on_pause(self) -> None:
         self._running = False
         self._timer.stop()
+        self._update_run_button_label()
+
+    def _on_select_best(self) -> None:
+        self._on_pause()
+        best_creature = self._sim.current_best_creature()
+        self._selected_creature = best_creature
+        if best_creature is None:
+            self._grid_widget.set_selected(None)
+            self._append_log("No current best creature is available to select.")
+        else:
+            self._grid_widget.set_selected(best_creature.creature_id)
+        self._refresh()
 
     def _on_step_tick(self) -> None:
         self._on_pause()
@@ -816,6 +862,23 @@ class MainWindow(QMainWindow):
         self._on_pause()
         self._sim.set_profile(profile_id)
         self._tpe_edit.setText(str(self._sim.ticks_per_epoch))
+        self._selected_creature = None
+        self._grid_widget.set_selected(None)
+        self._sim.reset(preserve_hall_of_fame=self._sim.is_testing_ground())
+        self._save_ui_settings()
+        self._refresh()
+
+    def _on_custom_map_changed(self) -> None:
+        if self._applying_ui_settings:
+            return
+
+        custom_map_id = str(self._custom_map_combo.currentData() or '')
+        next_custom_map_id = custom_map_id or None
+        if next_custom_map_id == self._sim.custom_map_id:
+            return
+
+        self._on_pause()
+        self._sim.set_custom_map(next_custom_map_id)
         self._selected_creature = None
         self._grid_widget.set_selected(None)
         self._sim.reset(preserve_hall_of_fame=self._sim.is_testing_ground())
@@ -901,6 +964,7 @@ class MainWindow(QMainWindow):
         values = load_main_window_settings(
             self._settings,
             default_profile_id=config.DEFAULT_PROFILE_ID,
+            default_custom_map_id='',
             default_ticks_per_epoch=self._sim.ticks_per_epoch,
             default_seed=self._sim.seed,
         )
@@ -913,6 +977,9 @@ class MainWindow(QMainWindow):
         profile_index = self._profile_combo.findData(values['profile_id'])
         if profile_index >= 0:
             self._profile_combo.setCurrentIndex(profile_index)
+        custom_map_index = self._custom_map_combo.findData(values['custom_map_id'])
+        if custom_map_index >= 0:
+            self._custom_map_combo.setCurrentIndex(custom_map_index)
         self._tpe_edit.setText(str(values['ticks_per_epoch']))
         self._seed_edit.setText(str(values['seed']))
         self._btn_testing_ground.blockSignals(True)
@@ -924,6 +991,10 @@ class MainWindow(QMainWindow):
         profile_id = self._profile_combo.currentData()
         if profile_id is not None and profile_id != self._sim.profile_id:
             self._sim.set_profile(profile_id)
+
+        custom_map_id = str(self._custom_map_combo.currentData() or '')
+        if (custom_map_id or None) != self._sim.custom_map_id:
+            self._sim.set_custom_map(custom_map_id or None)
 
         ticks_per_epoch = self._parse_ticks_per_epoch_from_ui(default=self._sim.ticks_per_epoch)
         self._sim.ticks_per_epoch = ticks_per_epoch
@@ -967,6 +1038,7 @@ class MainWindow(QMainWindow):
             inject_saved_best_enabled=self._inject_saved_best_checkbox.isChecked(),
             autosave_path=self._autosave_best_path_edit.text().strip(),
             profile_id=str(self._profile_combo.currentData() or self._sim.profile_id),
+            custom_map_id=str(self._custom_map_combo.currentData() or ''),
             ticks_per_epoch=self._parse_ticks_per_epoch_from_ui(default=self._sim.ticks_per_epoch),
             seed=self._parse_seed_from_ui(default=self._sim.seed),
             testing_ground_enabled=self._sim.is_testing_ground(),
