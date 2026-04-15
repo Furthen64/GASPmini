@@ -149,6 +149,7 @@ def tick_creature(creature: Creature, world: WorldState) -> None:
     # 7. Update last action fields
     lt.last_action = action
     lt.last_action_success = result.success
+    lt.history_buffer.push(sensor, action, result.success)
 
     # 8. Check death by starvation
     if lt.energy <= 0:

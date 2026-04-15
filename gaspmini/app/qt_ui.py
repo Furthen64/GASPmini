@@ -744,13 +744,13 @@ class MainWindow(QMainWindow):
             ]
             scored = sorted(
                 genome.genes,
-                key=lambda g: score_gene(g, sensor, lt.learned_gene_adjustments),
+                key=lambda g: score_gene(g, sensor, lt.learned_gene_adjustments, c),
                 reverse=True,
             )
             for g in scored[:5]:
                 ms  = score_gene_match(sensor, g.pattern)
                 adj = lt.learned_gene_adjustments.get(g.gene_id, 0.0)
-                ts  = score_gene(g, sensor, lt.learned_gene_adjustments)
+                ts  = score_gene(g, sensor, lt.learned_gene_adjustments, c)
                 lines.append(
                     f"  Gene {g.gene_id}: {_format_action_name(g.action)}  "
                     f"match={ms:.1f} base={g.base_priority:.2f} "
