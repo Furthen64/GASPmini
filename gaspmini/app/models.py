@@ -94,6 +94,15 @@ class HistoryEntry:
     tick_index: int
 
 
+@dataclass
+class RunHistorySample:
+    age_ticks: int
+    energy: float
+    food_eaten: int
+    failed_actions: int
+    alive: bool
+
+
 # ── LifetimeState ─────────────────────────────────────────────────────────────
 
 @dataclass
@@ -112,6 +121,7 @@ class LifetimeState:
     # gene_id -> cumulative learned adjustment
     learned_gene_adjustments: dict[int, float] = field(default_factory=dict)
     history: list[HistoryEntry] = field(default_factory=list)
+    run_history: list[RunHistorySample] = field(default_factory=list)
 
 
 # ── Creature ──────────────────────────────────────────────────────────────────

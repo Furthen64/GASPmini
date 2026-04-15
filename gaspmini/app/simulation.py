@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import app.config as config
 from app.models import (
-    ActionType, CellType, Creature, WorldState, ActionResult, HistoryEntry,
+    ActionType, CellType, Creature, WorldState, ActionResult, HistoryEntry, RunHistorySample,
 )
 from app.sensors import build_sensor_data
 from app.gene_logic import choose_gene, score_gene
@@ -30,6 +30,19 @@ def _consume_food_at(creature: Creature, world: WorldState, x: int, y: int) -> b
     creature.lifetime.food_eaten += 1
     creature.lifetime.energy += config.ENERGY_GAIN_FROM_FOOD
     return True
+
+
+def _record_run_history_sample(creature: Creature) -> None:
+    lt = creature.lifetime
+    lt.run_history.append(
+        RunHistorySample(
+            age_ticks=lt.age_ticks,
+            energy=lt.energy,
+            food_eaten=lt.food_eaten,
+            failed_actions=lt.failed_actions,
+            alive=lt.alive,
+        )
+    )
 
 
 # ── Action execution ──────────────────────────────────────────────────────────
@@ -139,6 +152,8 @@ def tick_creature(creature: Creature, world: WorldState) -> None:
             f"Creature {creature.creature_id} died at tick {world.tick_index} "
             f"(food eaten: {lt.food_eaten})"
         )
+
+    _record_run_history_sample(creature)
 
 
 # ── World tick ────────────────────────────────────────────────────────────────

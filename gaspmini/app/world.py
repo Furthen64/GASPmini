@@ -10,7 +10,7 @@ from typing import Optional
 import app.config as config
 from app.models import (
     CellType, Direction, ActionType,
-    Gene, GenePattern, Genome, LifetimeState, Creature, WorldState,
+    Gene, GenePattern, Genome, LifetimeState, Creature, WorldState, RunHistorySample,
 )
 
 
@@ -193,6 +193,15 @@ def spawn_creatures(
             y=y,
             direction=rng.choice(list(Direction)),
             energy=float(config.INITIAL_ENERGY),
+        )
+        lifetime.run_history.append(
+            RunHistorySample(
+                age_ticks=0,
+                energy=lifetime.energy,
+                food_eaten=0,
+                failed_actions=0,
+                alive=True,
+            )
         )
         world.creatures.append(Creature(
             creature_id=idx,

@@ -6,6 +6,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 import unittest
 import random
+import tempfile
 
 import app.config as config
 from app.models import (
@@ -210,6 +211,90 @@ class TestEvolution(unittest.TestCase):
             self.assertEqual(len(sim.world.creatures), config.POPULATION_SIZE)
         finally:
             config.apply_profile(original_profile)
+
+    def test_enter_testing_ground_uses_best_genome_ever(self):
+        sim = SimulationRunner(seed=13)
+        sim.best_genome_ever = _make_genome(9)
+
+        entered = sim.enter_testing_ground()
+
+        self.assertTrue(entered)
+        self.assertTrue(sim.is_testing_ground())
+        self.assertIsNotNone(sim.world)
+        self.assertEqual(len(sim.world.creatures), 1)
+        self.assertEqual(len(sim.world.creatures[0].genome.genes), 9)
+
+    def test_enter_testing_ground_falls_back_to_current_best_creature(self):
+        sim = SimulationRunner(seed=17)
+        weaker = _make_creature(0, food_eaten=1, age_ticks=5)
+        stronger = _make_creature(1, food_eaten=5, age_ticks=20)
+        weaker.genome = _make_genome(4)
+        stronger.genome = _make_genome(8)
+        sim.world = WorldState(width=10, height=10, creatures=[weaker, stronger])
+
+        entered = sim.enter_testing_ground()
+
+        self.assertTrue(entered)
+        self.assertEqual(len(sim.world.creatures), 1)
+        self.assertEqual(len(sim.world.creatures[0].genome.genes), 8)
+
+    def test_testing_ground_runs_until_death_without_advancing_epoch(self):
+        sim = SimulationRunner(seed=19)
+        sim.best_genome_ever = _make_genome(6)
+        sim.enter_testing_ground()
+        assert sim.world is not None
+        sim.world.creatures[0].lifetime.energy = 1.0
+
+        sim.step_tick()
+
+        self.assertTrue(sim.is_run_complete())
+        self.assertEqual(sim.world.epoch_index, 0)
+        self.assertEqual(len(sim.epoch_history), 0)
+
+    def test_autosave_best_creature_writes_file(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = os.path.join(temp_dir, 'best.json')
+            sim = SimulationRunner(seed=23, ticks_per_epoch=1)
+            sim.configure_best_genome_persistence(
+                autosave_enabled=True,
+                autosave_path=path,
+                inject_saved_best_enabled=False,
+            )
+            world = WorldState(width=10, height=10, tick_index=1, epoch_index=0)
+            world.creatures = [
+                _make_creature(0, food_eaten=4, age_ticks=10),
+                _make_creature(1, food_eaten=1, age_ticks=10),
+            ]
+            sim.world = world
+
+            sim.step_epoch()
+
+            self.assertTrue(os.path.isfile(path))
+
+    def test_reset_can_inject_saved_best_into_random_population(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = os.path.join(temp_dir, 'best.json')
+            source_sim = SimulationRunner(seed=29)
+            source_sim.best_genome_ever = _make_genome(11)
+            source_sim.configure_best_genome_persistence(
+                autosave_enabled=True,
+                autosave_path=path,
+                inject_saved_best_enabled=False,
+            )
+            source_sim._autosave_best_genome_if_enabled()
+
+            sim = SimulationRunner(seed=31)
+            sim.configure_best_genome_persistence(
+                autosave_enabled=False,
+                autosave_path=path,
+                inject_saved_best_enabled=True,
+            )
+
+            sim.reset()
+
+            self.assertIsNotNone(sim.world)
+            self.assertEqual(len(sim.world.creatures), config.POPULATION_SIZE)
+            self.assertTrue(any(len(c.genome.genes) == 11 for c in sim.world.creatures))
 
 
 if __name__ == '__main__':

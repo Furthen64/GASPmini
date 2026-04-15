@@ -68,8 +68,11 @@ python -m pytest tests/ -v
 | Step Epoch | Run to end of epoch, then evolve |
 | Reset | Restart with current seed |
 | New Seed | Pick a random seed and restart |
+| Enter Testing Ground | Run the best known creature alone until it dies |
 
 Click any creature cell in the grid to inspect its sensor data, gene scores, learned adjustments, and history.
+The selected-creature panel also shows a per-run graph for energy, food eaten, and failed actions.
+The controls panel also lets you autosave the best creature genome to a JSON file and inject that saved genome into a fresh reset population.
 
 ## Key design principles (v1)
 

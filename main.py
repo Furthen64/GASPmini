@@ -33,10 +33,13 @@ def run_console() -> None:
 
 
 def run_gui() -> None:
+    from PySide6.QtCore import QCoreApplication
     from PySide6.QtWidgets import QApplication
     from app.qt_ui import MainWindow
 
     app = QApplication(sys.argv)
+    QCoreApplication.setOrganizationName('GASPmini')
+    QCoreApplication.setApplicationName('GASPmini')
     window = MainWindow()
     window.show()
     sys.exit(app.exec())

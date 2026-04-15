@@ -1,0 +1,44 @@
+import os
+import sys
+import tempfile
+import unittest
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+from app.models import ActionType, CellType, Gene, GenePattern, Genome
+from app.genome_store import genome_file_exists, load_genome_from_file, save_genome_to_file
+
+
+def _make_genome() -> Genome:
+    return Genome(
+        genes=[
+            Gene(
+                gene_id=0,
+                pattern=GenePattern(CellType.FOOD, CellType.EMPTY, None, None, None, ActionType.MOVE_FORWARD, True, 2),
+                action=ActionType.EAT,
+                base_priority=1.25,
+            )
+        ],
+        learning_rate=0.2,
+        reward_decay=0.8,
+        exploration_rate=0.03,
+        history_length=8,
+    )
+
+
+class TestGenomeStore(unittest.TestCase):
+
+    def test_save_and_load_round_trip(self):
+        genome = _make_genome()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = os.path.join(temp_dir, 'best.json')
+
+            save_genome_to_file(genome, path)
+
+            self.assertTrue(genome_file_exists(path))
+            loaded = load_genome_from_file(path)
+            self.assertEqual(loaded, genome)
+
+
+if __name__ == '__main__':
+    unittest.main()

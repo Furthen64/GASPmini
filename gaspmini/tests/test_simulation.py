@@ -18,6 +18,7 @@ from app.models import (
     WorldState,
 )
 from app.simulation import execute_action
+from app.simulation import tick_creature
 
 
 def _make_creature(
@@ -78,6 +79,18 @@ class TestSimulation(unittest.TestCase):
         self.assertEqual(creature.lifetime.food_eaten, 1)
         self.assertEqual(creature.lifetime.energy, 30.0 + config.ENERGY_GAIN_FROM_FOOD)
         self.assertEqual(result.reward, config.REWARD_EAT_FOOD)
+
+    def test_tick_creature_records_run_history_sample(self):
+        creature = _make_creature()
+        world = WorldState(width=8, height=8, creatures=[creature])
+
+        tick_creature(creature, world)
+
+        self.assertEqual(len(creature.lifetime.run_history), 1)
+        sample = creature.lifetime.run_history[0]
+        self.assertEqual(sample.age_ticks, 1)
+        self.assertEqual(sample.food_eaten, 0)
+        self.assertTrue(sample.alive)
 
 
 

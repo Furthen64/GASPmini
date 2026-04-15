@@ -7,21 +7,26 @@ from __future__ import annotations
 import sys
 from typing import Optional
 
-from PySide6.QtCore import Qt, QTimer, QRectF, QSize
-from PySide6.QtGui import QColor, QPainter, QFont, QMouseEvent, QPen
+from PySide6.QtCore import Qt, QTimer, QRectF, QSize, QSettings
+from PySide6.QtGui import QColor, QPainter, QFont, QMouseEvent, QPen, QCloseEvent
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
     QPushButton, QLabel, QTextEdit, QLineEdit, QGroupBox, QComboBox,
-    QSizePolicy, QScrollArea,
+    QSizePolicy, QScrollArea, QCheckBox,
 )
 
 import app.config as config
-from app.models import CellType, Creature, WorldState
+from app.models import CellType, Creature, RunHistorySample, WorldState
 from app.simulation_runner import SimulationRunner
 from app.sensors import build_sensor_data
 from app.gene_logic import score_gene, score_gene_match
 from app.evolution import compute_fitness
 from app.logging_utils import set_log_callback
+from app.ui_settings import (
+    make_app_settings,
+    load_main_window_settings,
+    save_main_window_settings,
+)
 
 
 # ── Colours ────────────────────────────────────────────────────────────────────
@@ -36,6 +41,12 @@ SELECTED_COLOR = QColor(255, 200, 0)
 GRID_LINE_COLOR = QColor(50, 50, 50)
 CELL_SIZE = 22   # pixels per cell
 EPOCH_HISTORY_WINDOW = 6
+GRAPH_BG_COLOR = QColor(24, 24, 24)
+GRAPH_FRAME_COLOR = QColor(78, 78, 78)
+GRAPH_TEXT_COLOR = QColor(220, 220, 220)
+ENERGY_LINE_COLOR = QColor(88, 180, 255)
+FOOD_LINE_COLOR = QColor(110, 220, 120)
+FAIL_LINE_COLOR = QColor(255, 170, 70)
 
 
 # ── Grid widget ────────────────────────────────────────────────────────────────
@@ -163,6 +174,123 @@ class GridWidget(QWidget):
             parent.on_grid_click(x, y)
 
 
+class RunHistoryGraphWidget(QWidget):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._samples: list[RunHistorySample] = []
+        self.setMinimumHeight(220)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+
+    def set_samples(self, samples: list[RunHistorySample]) -> None:
+        self._samples = list(samples)
+        self.update()
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.fillRect(self.rect(), GRAPH_BG_COLOR)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+
+        if not self._samples:
+            painter.setPen(GRAPH_TEXT_COLOR)
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "Select a creature to view run history")
+            painter.end()
+            return
+
+        outer = self.rect().adjusted(10, 10, -10, -10)
+        panels = [
+            ("Energy", [sample.energy for sample in self._samples], ENERGY_LINE_COLOR),
+            ("Food", [sample.food_eaten for sample in self._samples], FOOD_LINE_COLOR),
+            ("Failures", [sample.failed_actions for sample in self._samples], FAIL_LINE_COLOR),
+        ]
+        gap = 8
+        panel_height = max(40, int((outer.height() - gap * (len(panels) - 1)) / len(panels)))
+
+        for index, (label, values, color) in enumerate(panels):
+            top = outer.top() + index * (panel_height + gap)
+            panel_rect = QRectF(float(outer.left()), float(top), float(outer.width()), float(panel_height))
+            self._draw_panel(painter, panel_rect, label, values, color)
+
+        painter.end()
+
+    def _draw_panel(
+        self,
+        painter: QPainter,
+        panel_rect: QRectF,
+        label: str,
+        values: list[float],
+        color: QColor,
+    ) -> None:
+        painter.setPen(QPen(GRAPH_FRAME_COLOR, 1))
+        painter.drawRoundedRect(panel_rect, 4, 4)
+
+        painter.setPen(GRAPH_TEXT_COLOR)
+        current_value = values[-1]
+        max_value = max(values) if values else 0
+        painter.drawText(
+            panel_rect.adjusted(8, 6, -8, -6),
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
+            f"{label}"
+        )
+        painter.drawText(
+            panel_rect.adjusted(8, 6, -8, -6),
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop,
+            f"now {current_value:.1f}  max {max_value:.1f}"
+        )
+
+        plot_rect = panel_rect.adjusted(10, 24, -10, -10)
+        painter.setPen(QPen(GRAPH_FRAME_COLOR, 1))
+        painter.drawRect(plot_rect)
+
+        if len(values) == 1:
+            painter.setPen(QPen(color, 2))
+            center_y = plot_rect.center().y()
+            painter.drawLine(plot_rect.left(), center_y, plot_rect.right(), center_y)
+            return
+
+        value_min = min(values)
+        value_max = max(values)
+        if value_max == value_min:
+            value_max = value_min + 1.0
+
+        mid_y = plot_rect.top() + plot_rect.height() / 2
+        painter.setPen(QPen(GRAPH_FRAME_COLOR, 1, Qt.PenStyle.DashLine))
+        painter.drawLine(plot_rect.left(), mid_y, plot_rect.right(), mid_y)
+
+        painter.setPen(QPen(color, 2))
+        point_count = len(values)
+        for index in range(point_count - 1):
+            x1 = plot_rect.left() + plot_rect.width() * index / max(1, point_count - 1)
+            x2 = plot_rect.left() + plot_rect.width() * (index + 1) / max(1, point_count - 1)
+            y1 = self._value_to_y(values[index], value_min, value_max, plot_rect)
+            y2 = self._value_to_y(values[index + 1], value_min, value_max, plot_rect)
+            painter.drawLine(x1, y1, x2, y2)
+
+        painter.setBrush(color)
+        painter.setPen(Qt.PenStyle.NoPen)
+        last_x = plot_rect.right()
+        last_y = self._value_to_y(values[-1], value_min, value_max, plot_rect)
+        painter.drawEllipse(QRectF(last_x - 3, last_y - 3, 6, 6))
+
+        painter.setPen(GRAPH_TEXT_COLOR)
+        start_tick = self._samples[0].age_ticks
+        end_tick = self._samples[-1].age_ticks
+        painter.drawText(
+            plot_rect.adjusted(2, 0, -2, 0),
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom,
+            f"t={start_tick}"
+        )
+        painter.drawText(
+            plot_rect.adjusted(2, 0, -2, 0),
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignBottom,
+            f"t={end_tick}"
+        )
+
+    @staticmethod
+    def _value_to_y(value: float, value_min: float, value_max: float, rect: QRectF) -> float:
+        fraction = (value - value_min) / (value_max - value_min)
+        return rect.bottom() - fraction * rect.height()
+
+
 # ── Main Window ────────────────────────────────────────────────────────────────
 
 class MainWindow(QMainWindow):
@@ -179,11 +307,14 @@ class MainWindow(QMainWindow):
         self._timer_interval_ms = 100   # ms between ticks when running
 
         self._selected_creature: Optional[Creature] = None
+        self._settings: QSettings = make_app_settings()
+        self._applying_ui_settings = False
 
         # Redirect log output to the log panel
         set_log_callback(self._append_log)
 
         self._build_ui()
+        self._load_ui_settings()
         self._refresh()
 
     # ── UI construction ────────────────────────────────────────────────────────
@@ -212,10 +343,11 @@ class MainWindow(QMainWindow):
         # Simulation status
         status_group = QGroupBox("Simulation")
         status_layout = QVBoxLayout(status_group)
+        self._lbl_mode = QLabel("Mode: Evolution")
         self._lbl_epoch = QLabel("Epoch: 0")
         self._lbl_tick  = QLabel("Tick: 0")
         self._lbl_alive = QLabel("Alive: 0")
-        for lbl in (self._lbl_epoch, self._lbl_tick, self._lbl_alive):
+        for lbl in (self._lbl_mode, self._lbl_epoch, self._lbl_tick, self._lbl_alive):
             status_layout.addWidget(lbl)
         right_layout.addWidget(status_group)
 
@@ -237,15 +369,18 @@ class MainWindow(QMainWindow):
         self._btn_step_tick = QPushButton("Step Tick")
         self._btn_step_epoch= QPushButton("Step Epoch")
         self._btn_reset     = QPushButton("Reset")
+        self._btn_testing_ground = QPushButton("Enter Testing Ground")
+        self._btn_testing_ground.setCheckable(True)
 
         self._btn_start.clicked.connect(self._on_start)
         self._btn_pause.clicked.connect(self._on_pause)
         self._btn_step_tick.clicked.connect(self._on_step_tick)
         self._btn_step_epoch.clicked.connect(self._on_step_epoch)
         self._btn_reset.clicked.connect(self._on_reset)
+        self._btn_testing_ground.toggled.connect(self._on_testing_ground_toggled)
 
         for btn in (self._btn_start, self._btn_pause, self._btn_step_tick,
-                    self._btn_step_epoch, self._btn_reset):
+                self._btn_step_epoch, self._btn_reset, self._btn_testing_ground):
             ctrl_layout.addWidget(btn)
 
         # Seed control
@@ -253,6 +388,7 @@ class MainWindow(QMainWindow):
         seed_layout.addWidget(QLabel("Seed:"))
         self._seed_edit = QLineEdit(str(self._sim.seed))
         self._seed_edit.setFixedWidth(80)
+        self._seed_edit.editingFinished.connect(self._save_ui_settings)
         seed_layout.addWidget(self._seed_edit)
         btn_new_seed = QPushButton("New Seed")
         btn_new_seed.clicked.connect(self._on_new_seed)
@@ -276,8 +412,33 @@ class MainWindow(QMainWindow):
         tpe_layout.addWidget(QLabel("Ticks/Epoch:"))
         self._tpe_edit = QLineEdit(str(self._sim.ticks_per_epoch))
         self._tpe_edit.setFixedWidth(80)
+        self._tpe_edit.editingFinished.connect(self._save_ui_settings)
         tpe_layout.addWidget(self._tpe_edit)
         ctrl_layout.addLayout(tpe_layout)
+
+        persistence_group = QGroupBox("Best Creature Persistence")
+        persistence_layout = QVBoxLayout(persistence_group)
+        self._autosave_best_checkbox = QCheckBox("Autosave best creature")
+        self._inject_saved_best_checkbox = QCheckBox("Inject saved creature on reset")
+        self._autosave_best_checkbox.toggled.connect(self._save_ui_settings)
+        self._inject_saved_best_checkbox.toggled.connect(self._save_ui_settings)
+        persistence_layout.addWidget(self._autosave_best_checkbox)
+        persistence_layout.addWidget(self._inject_saved_best_checkbox)
+
+        autosave_path_layout = QHBoxLayout()
+        autosave_path_layout.addWidget(QLabel("File:"))
+        self._autosave_best_path_edit = QLineEdit(self._sim.autosave_best_path)
+        self._autosave_best_path_edit.editingFinished.connect(self._save_ui_settings)
+        autosave_path_layout.addWidget(self._autosave_best_path_edit)
+        persistence_layout.addLayout(autosave_path_layout)
+
+        self._btn_save_best_now = QPushButton("Save Best Now")
+        self._btn_load_saved_best = QPushButton("Check Saved File")
+        self._btn_save_best_now.clicked.connect(self._on_save_best_now)
+        self._btn_load_saved_best.clicked.connect(self._on_check_saved_best)
+        persistence_layout.addWidget(self._btn_save_best_now)
+        persistence_layout.addWidget(self._btn_load_saved_best)
+        ctrl_layout.addWidget(persistence_group)
 
         right_layout.addWidget(ctrl_group)
 
@@ -288,6 +449,8 @@ class MainWindow(QMainWindow):
         self._creature_info.setReadOnly(True)
         self._creature_info.setFixedHeight(220)
         creature_layout.addWidget(self._creature_info)
+        self._creature_history_graph = RunHistoryGraphWidget()
+        creature_layout.addWidget(self._creature_history_graph)
         right_layout.addWidget(creature_group)
 
         # Log output
@@ -310,17 +473,19 @@ class MainWindow(QMainWindow):
         if world is None:
             return
 
+        self._sync_selected_creature()
+
+        mode_label = "Testing Ground" if self._sim.is_testing_ground() else "Evolution"
+        self._lbl_mode.setText(f"Mode: {mode_label}")
+        self._sync_persistence_settings_from_ui()
         self._lbl_epoch.setText(f"Epoch: {world.epoch_index}")
-        self._lbl_tick.setText(f"Tick: {world.tick_index} / {self._sim.ticks_per_epoch}")
+        if self._sim.is_testing_ground():
+            self._lbl_tick.setText(f"Tick: {world.tick_index}")
+        else:
+            self._lbl_tick.setText(f"Tick: {world.tick_index} / {self._sim.ticks_per_epoch}")
         self._lbl_alive.setText(f"Alive: {self._sim.alive_count()} / {len(world.creatures)}")
         self._refresh_epoch_history()
-
-        # Keep selected creature reference fresh
-        if self._selected_creature is not None:
-            cid = self._selected_creature.creature_id
-            found = next((c for c in world.creatures if c.creature_id == cid), None)
-            self._selected_creature = found
-            self._refresh_creature_info()
+        self._refresh_creature_info()
 
         self._grid_widget._update_size()
         self._grid_widget.update()
@@ -358,6 +523,7 @@ class MainWindow(QMainWindow):
         c = self._selected_creature
         if c is None:
             self._creature_info.setPlainText("(no creature selected – click a cell)")
+            self._creature_history_graph.set_samples([])
             return
 
         lt = c.lifetime
@@ -417,6 +583,25 @@ class MainWindow(QMainWindow):
                 lines.append(f"  Gene {gid}: {adj:+.4f}")
 
         self._creature_info.setPlainText('\n'.join(lines))
+        self._creature_history_graph.set_samples(lt.run_history)
+
+    def _sync_selected_creature(self) -> None:
+        world = self._sim.world
+        if world is None:
+            self._selected_creature = None
+            self._grid_widget.set_selected(None)
+            return
+
+        if self._selected_creature is not None:
+            cid = self._selected_creature.creature_id
+            self._selected_creature = next((c for c in world.creatures if c.creature_id == cid), None)
+
+        if self._sim.is_testing_ground():
+            if self._selected_creature is None:
+                self._selected_creature = self._sim.current_best_creature()
+
+        selected_id = self._selected_creature.creature_id if self._selected_creature is not None else None
+        self._grid_widget.set_selected(selected_id)
 
     # ── Event handlers ─────────────────────────────────────────────────────────
 
@@ -449,6 +634,9 @@ class MainWindow(QMainWindow):
         self._refresh()
 
     def _on_profile_changed(self) -> None:
+        if self._applying_ui_settings:
+            return
+
         profile_id = self._profile_combo.currentData()
         if profile_id is None or profile_id == self._sim.profile_id:
             return
@@ -458,11 +646,13 @@ class MainWindow(QMainWindow):
         self._tpe_edit.setText(str(self._sim.ticks_per_epoch))
         self._selected_creature = None
         self._grid_widget.set_selected(None)
-        self._sim.reset()
+        self._sim.reset(preserve_hall_of_fame=self._sim.is_testing_ground())
+        self._save_ui_settings()
         self._refresh()
 
     def _on_reset(self) -> None:
         self._on_pause()
+        self._sync_persistence_settings_from_ui()
         seed_text = self._seed_edit.text().strip()
         try:
             seed = int(seed_text)
@@ -479,7 +669,8 @@ class MainWindow(QMainWindow):
             self._tpe_edit.setText(str(self._sim.ticks_per_epoch))
         self._selected_creature = None
         self._grid_widget.set_selected(None)
-        self._sim.reset(seed=seed)
+        self._sim.reset(seed=seed, preserve_hall_of_fame=self._sim.is_testing_ground())
+        self._save_ui_settings()
         self._refresh()
 
     def _on_new_seed(self) -> None:
@@ -489,11 +680,139 @@ class MainWindow(QMainWindow):
         self._on_reset()
 
     def _on_timer(self) -> None:
-        if self._sim.is_epoch_over():
-            self._sim.step_epoch()
-        else:
-            self._sim.step_tick()
+        if self._sim.is_testing_ground() and self._sim.is_run_complete():
+            self._on_pause()
+            self._refresh()
+            return
+
+        self._sim.step_tick()
+        if self._sim.is_testing_ground() and self._sim.is_run_complete():
+            self._on_pause()
         self._refresh()
+
+    def _on_testing_ground_toggled(self, checked: bool) -> None:
+        self._on_pause()
+
+        if checked:
+            if not self._sim.enter_testing_ground():
+                self._append_log("Testing Ground unavailable: no best or current creature to clone.")
+                self._btn_testing_ground.blockSignals(True)
+                self._btn_testing_ground.setChecked(False)
+                self._btn_testing_ground.blockSignals(False)
+                self._btn_testing_ground.setText("Enter Testing Ground")
+                return
+            self._btn_testing_ground.setText("Exit Testing Ground")
+            self._selected_creature = self._sim.current_best_creature()
+        else:
+            if self._sim.is_testing_ground():
+                self._sim.exit_testing_ground()
+            self._btn_testing_ground.setText("Enter Testing Ground")
+            self._selected_creature = None
+            self._grid_widget.set_selected(None)
+
+        self._save_ui_settings()
+        self._refresh()
+
+    def _sync_persistence_settings_from_ui(self) -> None:
+        self._sim.configure_best_genome_persistence(
+            autosave_enabled=self._autosave_best_checkbox.isChecked(),
+            autosave_path=self._autosave_best_path_edit.text().strip(),
+            inject_saved_best_enabled=self._inject_saved_best_checkbox.isChecked(),
+        )
+
+    def _load_ui_settings(self) -> None:
+        values = load_main_window_settings(
+            self._settings,
+            default_profile_id=config.DEFAULT_PROFILE_ID,
+            default_ticks_per_epoch=self._sim.ticks_per_epoch,
+            default_seed=self._sim.seed,
+        )
+
+        self._applying_ui_settings = True
+        self._autosave_best_checkbox.setChecked(bool(values['autosave_enabled']))
+        self._inject_saved_best_checkbox.setChecked(bool(values['inject_saved_best_enabled']))
+        self._autosave_best_path_edit.setText(str(values['autosave_path']))
+
+        profile_index = self._profile_combo.findData(values['profile_id'])
+        if profile_index >= 0:
+            self._profile_combo.setCurrentIndex(profile_index)
+        self._tpe_edit.setText(str(values['ticks_per_epoch']))
+        self._seed_edit.setText(str(values['seed']))
+        self._btn_testing_ground.blockSignals(True)
+        self._btn_testing_ground.setChecked(False)
+        self._btn_testing_ground.blockSignals(False)
+        self._btn_testing_ground.setText("Enter Testing Ground")
+        self._applying_ui_settings = False
+
+        profile_id = self._profile_combo.currentData()
+        if profile_id is not None and profile_id != self._sim.profile_id:
+            self._sim.set_profile(profile_id)
+
+        ticks_per_epoch = self._parse_ticks_per_epoch_from_ui(default=self._sim.ticks_per_epoch)
+        self._sim.ticks_per_epoch = ticks_per_epoch
+        self._sync_persistence_settings_from_ui()
+
+        seed = self._parse_seed_from_ui(default=self._sim.seed)
+        self._sim.reset(seed=seed)
+
+        if bool(values['testing_ground_enabled']):
+            if self._sim.enter_testing_ground():
+                self._btn_testing_ground.blockSignals(True)
+                self._btn_testing_ground.setChecked(True)
+                self._btn_testing_ground.blockSignals(False)
+                self._btn_testing_ground.setText("Exit Testing Ground")
+                self._selected_creature = self._sim.current_best_creature()
+            else:
+                self._btn_testing_ground.setText("Enter Testing Ground")
+
+    def _save_ui_settings(self) -> None:
+        if self._applying_ui_settings:
+            return
+
+        save_main_window_settings(
+            self._settings,
+            autosave_enabled=self._autosave_best_checkbox.isChecked(),
+            inject_saved_best_enabled=self._inject_saved_best_checkbox.isChecked(),
+            autosave_path=self._autosave_best_path_edit.text().strip(),
+            profile_id=str(self._profile_combo.currentData() or self._sim.profile_id),
+            ticks_per_epoch=self._parse_ticks_per_epoch_from_ui(default=self._sim.ticks_per_epoch),
+            seed=self._parse_seed_from_ui(default=self._sim.seed),
+            testing_ground_enabled=self._sim.is_testing_ground(),
+        )
+        self._sync_persistence_settings_from_ui()
+
+    def _parse_seed_from_ui(self, default: int) -> int:
+        seed_text = self._seed_edit.text().strip()
+        try:
+            return int(seed_text)
+        except ValueError:
+            return default
+
+    def _parse_ticks_per_epoch_from_ui(self, default: int) -> int:
+        ticks_text = self._tpe_edit.text().strip()
+        try:
+            ticks = int(ticks_text)
+        except ValueError:
+            return default
+        if 1 <= ticks <= 10_000:
+            return ticks
+        return default
+
+    def _on_save_best_now(self) -> None:
+        self._sync_persistence_settings_from_ui()
+        if self._sim.best_genome_ever is None:
+            self._append_log("No best creature is available to save yet.")
+            return
+        from app.genome_store import save_genome_to_file
+        save_genome_to_file(self._sim.best_genome_ever, self._sim.autosave_best_path)
+        self._append_log(f"Saved best creature to {self._sim.autosave_best_path}")
+
+    def _on_check_saved_best(self) -> None:
+        self._sync_persistence_settings_from_ui()
+        if self._sim.has_saved_best_genome():
+            self._append_log(f"Saved best creature found at {self._sim.autosave_best_path}")
+        else:
+            self._append_log(f"No saved best creature found at {self._sim.autosave_best_path}")
 
     def _append_log(self, message: str) -> None:
         self._log_text.append(message)
@@ -501,3 +820,7 @@ class MainWindow(QMainWindow):
         self._log_text.verticalScrollBar().setValue(
             self._log_text.verticalScrollBar().maximum()
         )
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        self._save_ui_settings()
+        super().closeEvent(event)
