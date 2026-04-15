@@ -32,6 +32,7 @@ class SimulationProfile:
 	reward_idle: float
 	reward_death: float
 	reward_starvation_tick: float
+	potential_shaping_coefficient: float
 	fitness_food_weight: float
 	fitness_age_weight: float
 	fitness_stationary_age_factor: float
@@ -81,6 +82,7 @@ PROFILE_DEFINITIONS: dict[str, SimulationProfile] = {
 		reward_idle=-0.2,
 		reward_death=-5.0,
 		reward_starvation_tick=-0.5,
+		potential_shaping_coefficient=0.05,
 		fitness_food_weight=3.0,
 		fitness_age_weight=0.05,
 		fitness_stationary_age_factor=0.2,
@@ -120,6 +122,7 @@ PROFILE_DEFINITIONS: dict[str, SimulationProfile] = {
 		reward_idle=-0.1,
 		reward_death=-5.0,
 		reward_starvation_tick=-0.5,
+		potential_shaping_coefficient=0.05,
 		fitness_food_weight=3.0,
 		fitness_age_weight=0.06,
 		fitness_stationary_age_factor=0.2,
@@ -159,6 +162,7 @@ PROFILE_DEFINITIONS: dict[str, SimulationProfile] = {
 		reward_idle=-0.15,
 		reward_death=-5.0,
 		reward_starvation_tick=-0.5,
+		potential_shaping_coefficient=0.05,
 		fitness_food_weight=3.5,
 		fitness_age_weight=0.04,
 		fitness_stationary_age_factor=0.2,
@@ -221,6 +225,7 @@ def apply_profile(profile_id: str) -> SimulationProfile:
 		'REWARD_IDLE': values['reward_idle'],
 		'REWARD_DEATH': values['reward_death'],
 		'REWARD_STARVATION_TICK': values['reward_starvation_tick'],
+		'POTENTIAL_SHAPING_COEFFICIENT': values['potential_shaping_coefficient'],
 		'FITNESS_FOOD_WEIGHT': values['fitness_food_weight'],
 		'FITNESS_AGE_WEIGHT': values['fitness_age_weight'],
 		'FITNESS_STATIONARY_AGE_FACTOR': values['fitness_stationary_age_factor'],
