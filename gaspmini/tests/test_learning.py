@@ -153,6 +153,22 @@ class TestLearning(unittest.TestCase):
         apply_reward_to_history(creature, reward=5.0)
         self.assertEqual(creature.lifetime.learned_gene_adjustments, {})
 
+    def test_n_step_return_uses_trajectory_rewards(self):
+        creature = _make_creature(learning_rate=1.0, reward_decay=0.5)
+        _add_history(creature, gene_id=0, tick=0, reward=1.0)
+        _add_history(creature, gene_id=1, tick=1, reward=2.0)
+        _add_history(creature, gene_id=2, tick=2, reward=4.0)
+
+        # Reward event propagated over recent trajectory:
+        # gene 2: 4.0
+        # gene 1: 2.0 + 0.5 * 4.0 = 4.0
+        # gene 0: 1.0 + 0.5 * 4.0 = 3.0
+        apply_reward_to_history(creature, reward=0.0)
+
+        self.assertAlmostEqual(creature.lifetime.learned_gene_adjustments.get(2, 0.0), 4.0)
+        self.assertAlmostEqual(creature.lifetime.learned_gene_adjustments.get(1, 0.0), 4.0)
+        self.assertAlmostEqual(creature.lifetime.learned_gene_adjustments.get(0, 0.0), 3.0)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -144,7 +144,8 @@ def tick_creature(creature: Creature, world: WorldState) -> None:
 
     # 6. Apply reward to history
     if result.reward != 0.0:
-        apply_reward_to_history(creature, result.reward)
+        # Reward is already stored in the newest transition tuple; use zero event bootstrap.
+        apply_reward_to_history(creature, 0.0)
 
     # 7. Update last action fields
     lt.last_action = action
@@ -154,6 +155,7 @@ def tick_creature(creature: Creature, world: WorldState) -> None:
     # 8. Check death by starvation
     if lt.energy <= 0:
         lt.alive = False
+        # Death is an external event reward not already present in transition history.
         apply_reward_to_history(creature, config.REWARD_DEATH)
         log(
             f"Creature {creature.creature_id} died at tick {world.tick_index} "
