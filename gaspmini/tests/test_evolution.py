@@ -78,16 +78,16 @@ class TestEvolution(unittest.TestCase):
         c1 = _make_creature(1, food_eaten=5, age_ticks=100, failed=50)
         self.assertGreater(compute_fitness(c0), compute_fitness(c1))
 
-    def test_fitness_increases_with_age(self):
+    def test_fitness_does_not_increase_with_age(self):
         c0 = _make_creature(0, food_eaten=0, age_ticks=0)
         c1 = _make_creature(1, food_eaten=0, age_ticks=200)
-        self.assertGreater(compute_fitness(c1), compute_fitness(c0))
+        self.assertEqual(compute_fitness(c1), compute_fitness(c0))
 
-    def test_stationary_ticks_are_dampened_in_fitness(self):
+    def test_stationary_ticks_do_not_change_fitness_without_food(self):
         active = _make_creature(0, food_eaten=0, age_ticks=100, stationary_ticks=0)
         stationary = _make_creature(1, food_eaten=0, age_ticks=100, stationary_ticks=100)
 
-        self.assertGreater(compute_fitness(active), compute_fitness(stationary))
+        self.assertEqual(compute_fitness(active), compute_fitness(stationary))
 
     def test_results_sorted_descending(self):
         world = _make_world_with_creatures(5)

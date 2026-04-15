@@ -20,11 +20,8 @@ from app.logging_utils import debug_log, log
 
 def compute_fitness(creature: Creature) -> float:
     lt = creature.lifetime
-    stationary_age_ticks = lt.stationary_ticks * config.FITNESS_STATIONARY_AGE_FACTOR
-    active_age_ticks = max(0.0, (lt.age_ticks - lt.stationary_ticks) + stationary_age_ticks)
     return (
         config.FITNESS_FOOD_WEIGHT * lt.food_eaten
-        + config.FITNESS_AGE_WEIGHT * active_age_ticks
         + config.FITNESS_FAILED_WEIGHT * lt.failed_actions
     )
 
