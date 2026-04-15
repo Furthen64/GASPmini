@@ -6,24 +6,13 @@ from __future__ import annotations
 
 import app.config as config
 from app.models import Creature, HistoryEntry, SensorField, TransitionTuple
+from app.feature_encoding import encode_sensor_for_learning
 from app.logging_utils import debug_log
 
 
 def _sensor_to_state_features(sensor: SensorField) -> tuple[int, ...]:
-    """
-    Convert sensor fields into compact numeric features for reward telemetry.
-    """
-    last_action_code = 0 if sensor.last_action is None else sensor.last_action.value
-    return (
-        sensor.current_cell.value,
-        sensor.front_cell.value,
-        sensor.left_cell.value,
-        sensor.right_cell.value,
-        sensor.back_cell.value,
-        last_action_code,
-        1 if sensor.last_action_success else 0,
-        sensor.hunger_bucket,
-    )
+    """Convert sensor fields into numeric features for reward telemetry."""
+    return encode_sensor_for_learning(sensor)
 
 
 def record_history(

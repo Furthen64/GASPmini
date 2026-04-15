@@ -46,6 +46,7 @@ class SimulationProfile:
 	use_sensor_history_context: bool
 	sensor_history_context_length: int
 	history_context_decay: float
+	sensor_encoder_mode: str = "legacy"
 	debug_sensors: bool = False
 	debug_gene_scoring: bool = False
 	debug_actions: bool = False
@@ -234,6 +235,7 @@ def apply_profile(profile_id: str) -> SimulationProfile:
 		'USE_SENSOR_HISTORY_CONTEXT': values['use_sensor_history_context'],
 		'SENSOR_HISTORY_CONTEXT_LENGTH': values['sensor_history_context_length'],
 		'HISTORY_CONTEXT_DECAY': values['history_context_decay'],
+		'SENSOR_ENCODER_MODE': values['sensor_encoder_mode'],
 		'DEBUG_SENSORS': values['debug_sensors'],
 		'DEBUG_GENE_SCORING': values['debug_gene_scoring'],
 		'DEBUG_ACTIONS': values['debug_actions'],
