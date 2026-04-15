@@ -13,6 +13,7 @@ from app.config import GENE_MATCH_SCORE, GENE_WILDCARD_SCORE, GENE_MISMATCH_SCOR
 
 def make_sensor(**kwargs) -> SensorField:
     defaults = dict(
+        current_cell=CellType.EMPTY,
         front_cell=CellType.EMPTY,
         left_cell=CellType.EMPTY,
         right_cell=CellType.EMPTY,
@@ -27,6 +28,7 @@ def make_sensor(**kwargs) -> SensorField:
 
 def make_pattern(**kwargs) -> GenePattern:
     defaults = dict(
+        current_cell=None,
         front_cell=None,
         left_cell=None,
         right_cell=None,
@@ -45,7 +47,7 @@ class TestGeneMatch(unittest.TestCase):
         sensor = make_sensor()
         pattern = make_pattern()
         score = score_gene_match(sensor, pattern)
-        # 7 wildcard fields, each contributes GENE_WILDCARD_SCORE (0)
+        # 8 wildcard fields, each contributes GENE_WILDCARD_SCORE (0)
         self.assertEqual(score, 0.0)
 
     def test_exact_match_adds_positive(self):
@@ -69,6 +71,7 @@ class TestGeneMatch(unittest.TestCase):
 
     def test_all_fields_exact_match(self):
         sensor = make_sensor(
+            current_cell=CellType.EMPTY,
             front_cell=CellType.FOOD,
             left_cell=CellType.WALL,
             right_cell=CellType.EMPTY,
@@ -78,6 +81,7 @@ class TestGeneMatch(unittest.TestCase):
             hunger_bucket=2,
         )
         pattern = make_pattern(
+            current_cell=CellType.EMPTY,
             front_cell=CellType.FOOD,
             left_cell=CellType.WALL,
             right_cell=CellType.EMPTY,
@@ -87,7 +91,7 @@ class TestGeneMatch(unittest.TestCase):
             hunger_bucket=2,
         )
         score = score_gene_match(sensor, pattern)
-        self.assertEqual(score, GENE_MATCH_SCORE * 7)
+        self.assertEqual(score, GENE_MATCH_SCORE * 8)
 
     def test_mixed_fields(self):
         sensor = make_sensor(front_cell=CellType.FOOD, hunger_bucket=1)
@@ -96,9 +100,15 @@ class TestGeneMatch(unittest.TestCase):
             hunger_bucket=3,             # mismatch
         )
         score = score_gene_match(sensor, pattern)
-        # front_cell match + hunger mismatch + 5 wildcards
-        expected = GENE_MATCH_SCORE + GENE_MISMATCH_SCORE + 5 * GENE_WILDCARD_SCORE
+        # front_cell match + hunger mismatch + 6 wildcards
+        expected = GENE_MATCH_SCORE + GENE_MISMATCH_SCORE + 6 * GENE_WILDCARD_SCORE
         self.assertAlmostEqual(score, expected)
+
+    def test_current_cell_match_contributes_to_score(self):
+        sensor = make_sensor(current_cell=CellType.FOOD)
+        pattern = make_pattern(current_cell=CellType.FOOD)
+        score = score_gene_match(sensor, pattern)
+        self.assertEqual(score, GENE_MATCH_SCORE)
 
     def test_hunger_bucket_exact(self):
         sensor = make_sensor(hunger_bucket=3)

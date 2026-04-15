@@ -25,6 +25,7 @@ def _score_field(pattern_value, sensor_value) -> float:
 def score_gene_match(sensor: SensorField, gene_pattern: GenePattern) -> float:
     """Return a match score for a gene pattern against the current sensor data."""
     total = 0.0
+    total += _score_field(gene_pattern.current_cell,       sensor.current_cell)
     total += _score_field(gene_pattern.front_cell,         sensor.front_cell)
     total += _score_field(gene_pattern.left_cell,          sensor.left_cell)
     total += _score_field(gene_pattern.right_cell,         sensor.right_cell)

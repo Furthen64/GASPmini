@@ -385,6 +385,7 @@ class MainWindow(QMainWindow):
             sensor = build_sensor_data(c, world)
             lines += [
                 "── Sensor ──",
+                f"Current: {sensor.current_cell.name}",
                 f"Front: {sensor.front_cell.name}",
                 f"Left:  {sensor.left_cell.name}",
                 f"Right: {sensor.right_cell.name}",

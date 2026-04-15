@@ -23,6 +23,15 @@ def _front_position(creature: Creature) -> tuple[int, int]:
     return lt.x + dx, lt.y + dy
 
 
+def _consume_food_at(creature: Creature, world: WorldState, x: int, y: int) -> bool:
+    if (x, y) not in world.food_positions:
+        return False
+    world.food_positions.discard((x, y))
+    creature.lifetime.food_eaten += 1
+    creature.lifetime.energy += config.ENERGY_GAIN_FROM_FOOD
+    return True
+
+
 # ── Action execution ──────────────────────────────────────────────────────────
 
 def execute_action(
@@ -55,14 +64,10 @@ def execute_action(
         return ActionResult(success=True, reward=0.0, notes=f"moved to ({fx},{fy})")
 
     elif action == ActionType.EAT:
-        fx, fy = _front_position(creature)
-        if (fx, fy) in world.food_positions:
-            world.food_positions.discard((fx, fy))
-            lt.food_eaten += 1
-            lt.energy += config.ENERGY_GAIN_FROM_FOOD
-            return ActionResult(success=True, reward=config.REWARD_EAT_FOOD, notes="ate food")
+        if _consume_food_at(creature, world, lt.x, lt.y):
+            return ActionResult(success=True, reward=config.REWARD_EAT_FOOD, notes="ate food underfoot")
         lt.failed_actions += 1
-        return ActionResult(success=False, reward=config.REWARD_FAILED_EAT, notes="no food in front")
+        return ActionResult(success=False, reward=config.REWARD_FAILED_EAT, notes="no food underfoot")
 
     elif action == ActionType.IDLE:
         return ActionResult(success=True, reward=config.REWARD_IDLE, notes="idle")

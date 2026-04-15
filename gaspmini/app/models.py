@@ -41,6 +41,7 @@ class ActionType(Enum):
 @dataclass
 class SensorField:
     """Snapshot of what a creature currently perceives."""
+    current_cell: CellType
     front_cell: CellType
     left_cell: CellType
     right_cell: CellType
@@ -54,6 +55,7 @@ class SensorField:
 @dataclass
 class GenePattern:
     """Pattern to match against a SensorField.  None means wildcard."""
+    current_cell: Optional[CellType]
     front_cell: Optional[CellType]
     left_cell: Optional[CellType]
     right_cell: Optional[CellType]

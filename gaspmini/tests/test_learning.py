@@ -22,7 +22,7 @@ def _make_creature(
         genes=[
             Gene(
                 gene_id=i,
-                pattern=GenePattern(None, None, None, None, None, None, None),
+                pattern=GenePattern(None, None, None, None, None, None, None, None),
                 action=ActionType.IDLE,
                 base_priority=0.0,
             )
@@ -42,6 +42,7 @@ def _make_creature(
 
 def _dummy_sensor() -> SensorField:
     return SensorField(
+        current_cell=CellType.EMPTY,
         front_cell=CellType.EMPTY,
         left_cell=CellType.EMPTY,
         right_cell=CellType.EMPTY,

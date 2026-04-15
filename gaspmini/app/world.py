@@ -133,6 +133,7 @@ def _make_random_gene_pattern(rng: random.Random) -> GenePattern:
         return rng.randint(0, 3) if rng.random() < 0.4 else None
 
     return GenePattern(
+        current_cell=rand_cell(),
         front_cell=rand_cell(),
         left_cell=rand_cell(),
         right_cell=rand_cell(),

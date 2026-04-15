@@ -25,7 +25,7 @@ def _make_genome(n_genes: int = 5) -> Genome:
         genes=[
             Gene(
                 gene_id=i,
-                pattern=GenePattern(None, None, None, None, None, None, None),
+                pattern=GenePattern(None, None, None, None, None, None, None, None),
                 action=ActionType.IDLE,
                 base_priority=0.0,
             )

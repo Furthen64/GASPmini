@@ -91,12 +91,13 @@ def _mutate_gene_pattern(pattern: GenePattern, rng: random.Random) -> GenePatter
     bool_choices = [True, False, None]
 
     field = rng.choice([
-        'front_cell', 'left_cell', 'right_cell', 'back_cell',
+        'current_cell', 'front_cell', 'left_cell', 'right_cell', 'back_cell',
         'last_action', 'last_action_success', 'hunger_bucket',
     ])
 
     # Build a plain dict of the current values, then change one field.
     vals = {
+        'current_cell':        pattern.current_cell,
         'front_cell':          pattern.front_cell,
         'left_cell':           pattern.left_cell,
         'right_cell':          pattern.right_cell,
@@ -106,7 +107,7 @@ def _mutate_gene_pattern(pattern: GenePattern, rng: random.Random) -> GenePatter
         'hunger_bucket':       pattern.hunger_bucket,
     }
 
-    if field in ('front_cell', 'left_cell', 'right_cell', 'back_cell'):
+    if field in ('current_cell', 'front_cell', 'left_cell', 'right_cell', 'back_cell'):
         vals[field] = rng.choice(cell_choices)
     elif field == 'last_action':
         vals[field] = rng.choice(action_choices)
@@ -138,7 +139,7 @@ def mutate_genome(genome: Genome, rng: random.Random) -> Genome:
         new_id = max((g.gene_id for g in genome.genes), default=-1) + 1
         new_gene = Gene(
             gene_id=new_id,
-            pattern=GenePattern(None, None, None, None, None, None, None),
+            pattern=GenePattern(None, None, None, None, None, None, None, None),
             action=rng.choice(list(ActionType)),
             base_priority=0.0,
         )

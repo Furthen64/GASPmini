@@ -6,6 +6,7 @@ Simpler genetic algorithm playground for learning the basics
 GASPmini is a simple, debuggable Python + Qt simulation that demonstrates:
 
 - A 2D grid world with walls, food, and creatures
+- Local sensing for the current tile plus adjacent tiles, with eating allowed only on the current tile
 - Creatures with a **genome** (inherited traits) and **LifetimeState** (per-epoch state)
 - Within-epoch learning via temporal credit assignment
 - Between-epoch evolution (selection, crossover, mutation)

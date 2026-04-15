@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import app.config as config
 from app.models import CellType, Direction, SensorField, Creature, WorldState
-from app.world import get_cell_type
+from app.world import get_cell_type, is_inside
 
 
 # ── Direction helpers ─────────────────────────────────────────────────────────
@@ -45,6 +45,16 @@ def _cell_in_direction(
     return get_cell_type(world, x + dx, y + dy)
 
 
+def _current_cell_type(x: int, y: int, world: WorldState) -> CellType:
+    if not is_inside(world, x, y):
+        return CellType.WALL
+    if (x, y) in world.walls:
+        return CellType.WALL
+    if (x, y) in world.food_positions:
+        return CellType.FOOD
+    return CellType.EMPTY
+
+
 # ── Hunger buckets ────────────────────────────────────────────────────────────
 
 def _hunger_bucket(energy: float) -> int:
@@ -73,6 +83,7 @@ def build_sensor_data(creature: Creature, world: WorldState) -> SensorField:
     back_dir  = _turn_back(facing)
 
     return SensorField(
+        current_cell=_current_cell_type(x, y, world),
         front_cell=_cell_in_direction(x, y, facing,    world),
         left_cell= _cell_in_direction(x, y, left_dir,  world),
         right_cell=_cell_in_direction(x, y, right_dir, world),
