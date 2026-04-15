@@ -210,6 +210,31 @@ class TestEvolution(unittest.TestCase):
         self.assertEqual(sim.best_epoch_ever, 0)
         self.assertAlmostEqual(sim.best_fitness_ever, sim.epoch_history[0]['top_fitness'])
 
+    def test_step_epoch_imprints_lifetime_learning_into_genome_priorities(self):
+        original_factor = config.LEARNED_PRIORITY_IMPRINT_FACTOR
+        try:
+            sim = SimulationRunner(seed=19, ticks_per_epoch=1)
+            config.LEARNED_PRIORITY_IMPRINT_FACTOR = 0.5
+            world = WorldState(width=10, height=10, tick_index=1, epoch_index=0)
+
+            top_creature = _make_creature(0, food_eaten=4, age_ticks=20)
+            low_creature = _make_creature(1, food_eaten=0, age_ticks=2)
+            top_creature.genome = _make_genome(3)
+            low_creature.genome = _make_genome(3)
+            top_creature.lifetime.learned_gene_adjustments = {0: 2.0}
+            top_creature.genome.genes[0].base_priority = 1.0
+
+            world.creatures = [top_creature, low_creature]
+            sim.world = world
+
+            sim.step_epoch()
+
+            self.assertIsNotNone(sim.best_genome_ever)
+            # 1.0 + (2.0 * 0.5) = 2.0
+            self.assertAlmostEqual(sim.best_genome_ever.genes[0].base_priority, 2.0)
+        finally:
+            config.LEARNED_PRIORITY_IMPRINT_FACTOR = original_factor
+
     def test_profile_selection_changes_world_settings(self):
         original_profile = config.ACTIVE_PROFILE_ID
         try:
